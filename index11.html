@@ -1,0 +1,5808 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Simple JS Darts Demo - Mobile</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameBox {
+            position: relative;
+            width: 550px;
+            height: 400px;
+            background-image: url(media/beta-brd2.jpg);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            white-space: nowrap;
+            overflow: visible;
+        }
+
+        #dart {
+            position: absolute;
+            visibility: hidden;
+            background-image: url(media/dart-flight.gif);
+            left: 300px;
+            width: 57px;
+            height: 400px;
+        }
+
+        #scoreA {
+            position: absolute;
+            left: 29px;
+            top: 135px;
+            width: 68px;
+            height: 155px;
+            text-align: center;
+            font-size: 15px;
+            color: rgb(255, 255, 255);
+            font-weight: bold;
+            overflow: hidden;
+        }
+
+        #power-back {
+            position: absolute;
+            visibility: hidden;
+            left: 510px;
+            top: 130px;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            background-position: -36px 0px;
+        }
+
+        #power {
+            position: absolute;
+            visibility: hidden;
+            left: 0;
+            top: 0;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+        }
+
+        #debug {
+            width: 300px;
+            height: 600px;
+            overflow: auto;
+        }
+
+        #darts {
+            position: absolute;
+            top: 288px;
+            left: 34px;
+            width: 115px;
+            height: 108px;
+            background-image: url(media/darts.png);
+        }
+
+        #handCursor {
+            position: absolute;
+            top: 350px;
+            left: 450px;
+            width: 100px;
+            height: 114px;
+            background-image: url(media/hand-csr.gif);
+        }
+
+        #windIndicator {
+            position: absolute;
+            top: 11px;
+            left: 481px;
+            width: 58px;
+            height: 58px;
+        }
+
+        .windCell {
+            position: absolute;
+            width: 9px;
+            height: 9px;
+            background-image: url(media/wind.gif);
+        }
+
+        /* Mobile touch controls */
+        #touchControls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+        }
+
+        #aimButton, #fireButton {
+            display: inline-block;
+            padding: 15px 30px;
+            margin: 0 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #aimButton:active, #fireButton:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #aimButton.active {
+            background: rgba(255, 0, 0, 0.7);
+        }
+
+        @media screen and (max-width: 600px) {
+            #gameBox {
+                transform: scale(0.8);
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            #gameBox {
+                transform: scale(0.6);
+            }
+        }
+    </style>
+    <script>
+        var SHOW_PROGRESS_BAR = 1;
+        var WIND_ACTIVE = 1;
+
+        var GAME_XRES = 550;
+        var GAME_YRES = 400;
+
+        var HAND_REF_X = 12;
+
+        var BOARD_CENTER_X = 363;
+        var BOARD_CENTER_Y = 201;
+        var BOARD_RADIUS = 154;
+
+        var OFFSET_POINT_X = 515;
+        var OFFSET_POINT_Y = 176;
+
+        var SEGMENT_COUNT = 20;
+        var SEGMENT_SIZE = Math.PI / 10.0;
+
+        var SEGMENTS = [10, 21, 77, 90, 141, 154];
+        var SEGMENT_NAMES = ["50", "25", "value", "tripple", "value", "double", "out"];
+
+        var angleOffset = Math.round(-Math.atan2(BOARD_CENTER_Y - OFFSET_POINT_Y, BOARD_CENTER_X - OFFSET_POINT_X) * (180.0 / Math.PI) + 180.0);
+
+        var SCORE_VALUES = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6];
+
+        var targetAngle = 0;
+        var targetDelta = 0;
+        var targetDX = 0;
+        var targetDY = 0;
+
+        var segmentIndex = 0;
+        var segmentType = 0;
+        var segmentAngle = 0;
+        var segment = 0;
+        var totalScore = 0;
+
+        var DART_REF_X = 34;
+        var DART_REF_Y = 66;
+
+        var FLIGHT_ANIM_DELAY = 20;
+
+        var dartCount = 3;
+        var ligthOn = 0;
+
+        var CURSOR_LEFT = 10;
+        var CURSOR_RIGHT = 530;
+        var CURSOR_TOP = 350;
+        var CURSOR_BOTTOM = 380;
+
+        var CURSOR_HOR_STEP = 10;
+        var CURSOR_VER_STEP = 1;
+
+        var cursor_hor = CURSOR_HOR_STEP;
+        var cursor_ver = CURSOR_VER_STEP;
+
+        var CURSOR_TIMER = 50;
+
+        var hand_top = 350;
+        var hand_left = 450;
+
+        var cursorTimerId = 0;
+        var dartTimerId = 1;
+
+        var firing = 0;
+        var aimingMode = false;
+
+        var wind_angle = 0;
+        var wind_phase = 0;
+
+        var WIND_CELL_COUNT = 20;
+        var WIND_TIMER = 300;
+
+        var wind_cell_x = [WIND_CELL_COUNT];
+        var wind_cell_y = [WIND_CELL_COUNT];
+
+        var gameAngle = 0;
+        var windStrenght = 0;
+
+        var sprite_cellwidth = 57;
+        var sprite_cellheight = 400;
+        var sprite_cellnum = 21;
+        var animId;
+
+        // Mobile touch support
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        function initMobileControls() {
+            if (isMobile) {
+                // Add touch controls
+                var controlsDiv = document.createElement('div');
+                controlsDiv.id = 'touchControls';
+                controlsDiv.innerHTML = '<button id="aimButton">AIM</button><button id="fireButton">FIRE</button>';
+                document.body.appendChild(controlsDiv);
+
+                // Add touch event listeners
+                document.getElementById('aimButton').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    startVerticalCursorMovement();
+                });
+
+                document.getElementById('fireButton').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    stopVerticalCursorMovement();
+                });
+
+                // Add tap-to-aim functionality
+                document.getElementById('gameBox').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    if (!aimingMode) {
+                        var rect = this.getBoundingClientRect();
+                        var scaleX = GAME_XRES / rect.width;
+                        var scaleY = GAME_YRES / rect.height;
+                        
+                        var touch = e.touches[0];
+                        var x = (touch.clientX - rect.left) * scaleX;
+                        var y = (touch.clientY - rect.top) * scaleY;
+                        
+                        // Move cursor to touch position
+                        hand_left = Math.max(CURSOR_LEFT, Math.min(CURSOR_RIGHT, x - HAND_REF_X));
+                        hand_top = Math.max(CURSOR_TOP, Math.min(CURSOR_BOTTOM, y));
+                        moveCursor(hand_left, hand_top);
+                    }
+                });
+
+                // Prevent default touch behaviors
+                document.addEventListener('touchmove', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+
+                document.addEventListener('touchstart', function(e) {
+                    if (e.target.tagName !== 'BUTTON') {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+            }
+        }
+
+        // All your existing functions remain the same...
+        function initWindIndicator(newAngle) {
+            var wi = document.getElementById("windIndicator");
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newShadow = document.createElement("div");
+                var divIdName = "shadow" + i;
+                newShadow.setAttribute("id", divIdName);
+                newShadow.setAttribute("class", "windCell");
+                wi.appendChild(newShadow);
+            }
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newCell = document.createElement("div");
+                var divIdName = "cell" + i;
+                newCell.setAttribute("id", divIdName);
+                newCell.setAttribute("class", "windCell");
+                wi.appendChild(newCell);
+            }
+
+            setWindAngle(newAngle);
+            startWindAnimation();
+        }
+
+        function setWindAngle(newAngle) {
+            wind_angle = newAngle;
+            var rad = newAngle * (Math.PI / 180);
+            var rad2 = rad - Math.PI;
+            var radius = 23;
+            var cx = 29;
+            var cy = 29;
+            var sx = Math.cos(rad2) * radius + cx;
+            var sy = Math.sin(rad2) * radius + cy;
+            var step = (radius * 2) / WIND_CELL_COUNT;
+            var stp = 0;
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var px = sx + Math.cos(rad) * stp;
+                var py = sy + Math.sin(rad) * stp;
+
+                var sh = document.getElementById("shadow" + i);
+                sh.style.top = Math.round(py) - 4 + "px";
+                sh.style.left = Math.round(px) - 4 + "px";
+
+                var cl = document.getElementById("cell" + i);
+                cl.style.top = Math.round(py) - 4 + "px";
+                cl.style.left = Math.round(px) - 4 + "px";
+
+                if (WIND_CELL_COUNT - i > windStrenght) {
+                    cl.style.backgroundPosition = "-9px 0px";
+                } else {
+                    cl.style.backgroundPosition = "-36px 0px";
+                }
+                stp += step;
+            }
+        }
+
+        function startWindAnimation() {
+            setInterval("doWindAnimation()", WIND_TIMER);
+        }
+
+        function doWindAnimation() {
+            wind_phase++;
+            if (wind_phase > 4) wind_phase = 0;
+
+            for (i = 0; i < windStrenght; i++) {
+                var state = (wind_phase + i) % 4;
+                var offset = -(9 + state * 9);
+
+                var cl = document.getElementById("cell" + (WIND_CELL_COUNT - windStrenght + i));
+                cl.style.backgroundPosition = offset + "px 0px";
+            }
+        }
+
+        function generateAngle() {
+            gameAngle = Math.round(360 * Math.random());
+            windStrenght = Math.round(15 * Math.random()) + 5;
+            setWindAngle(gameAngle);
+        }
+
+        function getWindXOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var xo = Math.cos(a) * windStrenght;
+            return Math.round(xo);
+        }
+
+        function getWindYOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var yo = Math.sin(a) * windStrenght;
+            return Math.round(yo);
+        }
+
+        function initPowerBar(xpos, ypos) {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "visible";
+            el.style.top = ypos + "px";
+            el.style.left = xpos + "px";
+
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "visible";
+            setPowerBarProgress(0);
+        }
+
+        function setPowerBarProgress(val) {
+            var el = document.getElementById("power");
+            el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+            el.style.top = 140 - val + "px";
+            el.style.height = 150 - (139 - val) + "px";
+        }
+
+        function hidePowerBar() {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "hidden";
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "hidden";
+        }
+
+        function initCursor() {
+            hand_left = CURSOR_LEFT;
+            hand_top = CURSOR_TOP;
+        }
+
+        function moveCursor(newX, newY) {
+            hand_left = newX;
+            hand_top = newY;
+            var dart = document.getElementById("handCursor");
+            dart.style.left = hand_left + "px";
+            dart.style.top = hand_top + "px";
+        }
+
+        function doHorizontalCursorMovement() {
+            hand_left += cursor_hor;
+
+            if (cursor_hor > 0 && hand_left >= CURSOR_RIGHT) {
+                hand_left = CURSOR_RIGHT;
+                cursor_hor *= -1;
+            }
+
+            if (cursor_hor < 0 && hand_left < CURSOR_LEFT) {
+                hand_left = CURSOR_LEFT;
+                cursor_hor *= -1;
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function doVerticalCursorMovement() {
+            hand_top += cursor_ver;
+
+            if (cursor_ver > 0 && hand_top > CURSOR_BOTTOM) {
+                hand_top = CURSOR_BOTTOM;
+                cursor_ver *= -1;
+            }
+
+            if (cursor_ver < 0 && hand_top < CURSOR_TOP) {
+                hand_top = CURSOR_TOP;
+                cursor_ver *= -1;
+            }
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                var prog = (hand_top - CURSOR_TOP) * (130 / (CURSOR_BOTTOM - CURSOR_TOP));
+                setPowerBarProgress(prog);
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function startHorizontalCursorMovement() {
+            initCursor();
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "0px 0px";
+            cursorTimerId = setInterval("doHorizontalCursorMovement()", CURSOR_TIMER);
+        }
+
+        function stopHorizontalCursorMovement() {
+            clearInterval(cursorTimerId);
+        }
+
+        function startVerticalCursorMovement() {
+            if (firing == 0) {
+                aimingMode = true;
+                stopHorizontalCursorMovement();
+                cursorTimerId = setInterval("doVerticalCursorMovement()", CURSOR_TIMER);
+                firing = 1;
+
+                if (SHOW_PROGRESS_BAR == 1) {
+                    initPowerBar(510, 130);
+                }
+
+                // Update button state on mobile
+                if (isMobile) {
+                    document.getElementById("aimButton").classList.add("active");
+                }
+            }
+        }
+
+        function stopVerticalCursorMovement() {
+            firing = 0;
+            aimingMode = false;
+            clearInterval(cursorTimerId);
+
+            var fireY = 360 - (hand_top - CURSOR_TOP) * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+            if (WIND_ACTIVE == 1) {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+            } else {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X, fireY);
+            }
+
+            initCursor();
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "-100px 0px";
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                hidePowerBar();
+            }
+
+            // Update button state on mobile
+            if (isMobile) {
+                document.getElementById("aimButton").classList.remove("active");
+            }
+
+            setTimeout("startHorizontalCursorMovement()", 500);
+        }
+
+        function mouseHandler(evt) {
+            if (isMobile) return; // Disable mouse events on mobile
+
+            var node = evt.target ? evt.target : evt.srcElement ? evt.srcElement : null;
+            evt = evt ? evt : event ? event : null;
+
+            var xpo = evt.clientX;
+            var ypo = evt.clientY;
+
+            var rx = xpo - 350;
+            var ry = ypo - 150;
+
+            computeHit(rx, ry);
+            generateScore();
+            addScoreA(totalScore);
+        }
+
+        function fireDart(tarX, tarY) {
+            var dart = document.getElementById("dart");
+            dart.style.left = tarX + "px";
+            dart.style.top = tarY + "px";
+            dart.style.visibility = "visible";
+
+            computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+            generateScore();
+            addScoreA(totalScore);
+
+            dartCount--;
+            if (dartCount == 0) {
+                generateAngle();
+                dartCount = 3;
+            }
+            renderIndicator();
+            doFlightAnim(0);
+        }
+
+        function generateScore() {
+            if (SEGMENT_NAMES[segmentType] == "out") {
+                totalScore = 0;
+            } else if (SEGMENT_NAMES[segmentType] == "50") {
+                totalScore = 50;
+            } else {
+                if (SEGMENT_NAMES[segmentType] == "25") {
+                    totalScore = 25;
+                } else {
+                    totalScore = SCORE_VALUES[segment];
+                    if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+                    if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+                }
+            }
+        }
+
+        function computeHit(xpos, ypos) {
+            var dx = BOARD_CENTER_X - xpos;
+            var dy = BOARD_CENTER_Y - ypos;
+            var angle = Math.atan2(dy, dx);
+            var delta = Math.sqrt(dx * dx + dy * dy);
+
+            var sg = 0;
+            for (i = 0; i < 6; i++) {
+                if (delta > SEGMENTS[i]) sg = i + 1;
+            }
+
+            segmentType = sg;
+            segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+            segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+        }
+
+        function addScoreA(msg) {
+            var ni = document.getElementById("scoreA");
+            var newpar = document.createElement("i");
+            newpar.innerHTML = "" + msg + "<br>";
+            ni.appendChild(newpar);
+
+            var objDiv = document.getElementById("scoreA");
+            objDiv.scrollTop = objDiv.scrollHeight;
+        }
+
+        function showcell(x, y, id) {
+            var el = document.getElementById(id);
+            var cx = -(x * sprite_cellwidth);
+            var cy = -(y * sprite_cellheight);
+            el.style.backgroundPosition = cx + "px " + cy + "px";
+        }
+
+        function doFlightAnim(step) {
+            dartTimerId = clearTimeout(animId);
+            if (step <= 20) {
+                showcell(step, 0, "dart");
+                dartTimerId = setTimeout("doFlightAnim(" + (step + 1) + ");", FLIGHT_ANIM_DELAY);
+            } else {
+                // Reset hand cursor to closed position after animation completes
+                var el = document.getElementById("handCursor");
+                el.style.backgroundPosition = "0px 0px";
+            }
+        }
+
+        function renderIndicator() {
+            var width = dartCount * 35;
+            var drt = document.getElementById("darts");
+            drt.style.width = width + "px";
+        }
+
+        // Responsive scaling function
+        function scaleGame() {
+            var gameBox = document.getElementById('gameBox');
+            var windowWidth = window.innerWidth;
+            var windowHeight = window.innerHeight;
+            
+            var scaleX = windowWidth / GAME_XRES;
+            var scaleY = windowHeight / GAME_YRES;
+            var scale = Math.min(scaleX, scaleY, 1);
+            
+            gameBox.style.transform = 'scale(' + scale + ')';
+            gameBox.style.transformOrigin = 'top left';
+        }
+
+        // Initialize everything
+        window.addEventListener('load', function() {
+            initMobileControls();
+            startHorizontalCursorMovement();
+            initPowerBar(10, 10);
+            hidePowerBar();
+            initWindIndicator(45);
+            generateAngle();
+            scaleGame();
+        });
+
+        window.addEventListener('resize', scaleGame);
+
+        // Prevent zoom on double tap
+        var lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            var now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</head>
+
+<body onmouseup="mouseHandler(event)" onkeydown="startVerticalCursorMovement()" onkeyup="stopVerticalCursorMovement()">
+    <div id="gameBox">
+        <div id="windIndicator"></div>
+        <div id="darts"></div>
+        <div id="power-back" style="visibility: hidden; top: 10px; left: 10px">
+            <div id="power" style="visibility: hidden; background-position: 0px -139px; top: 140px; height: 11px;"></div>
+        </div>
+        <div id="handCursor" style="background-position: 0px 0px; left: 380px; top: 350px"></div>
+        <div id="scoreA"></div>
+        <div id="dart">&nbsp;</div>
+    </div>
+</body>
+</html> -->
+
+<!-- <script>
+        var SHOW_PROGRESS_BAR = 1;
+        var WIND_ACTIVE = 1;
+
+        var GAME_XRES = 550;
+        var GAME_YRES = 400;
+
+        var HAND_REF_X = 12;
+
+        var BOARD_CENTER_X = 363;
+        var BOARD_CENTER_Y = 201;
+        var BOARD_RADIUS = 154;
+
+        var OFFSET_POINT_X = 515;
+        var OFFSET_POINT_Y = 176;
+
+        var SEGMENT_COUNT = 20;
+        var SEGMENT_SIZE = Math.PI / 10.0;
+
+        var SEGMENTS = [10, 21, 77, 90, 141, 154];
+        var SEGMENT_NAMES = ["50", "25", "value", "tripple", "value", "double", "out"];
+
+        var angleOffset = Math.round(-Math.atan2(BOARD_CENTER_Y - OFFSET_POINT_Y, BOARD_CENTER_X - OFFSET_POINT_X) * (180.0 / Math.PI) + 180.0);
+
+        var SCORE_VALUES = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6];
+
+        var targetAngle = 0;
+        var targetDelta = 0;
+        var targetDX = 0;
+        var targetDY = 0;
+
+        var segmentIndex = 0;
+        var segmentType = 0;
+        var segmentAngle = 0;
+        var segment = 0;
+        var totalScore = 0;
+
+        var DART_REF_X = 34;
+        var DART_REF_Y = 66;
+
+        var FLIGHT_ANIM_DELAY = 20;
+
+        var dartCount = 3;
+        var ligthOn = 0;
+
+        var CURSOR_LEFT = 10;
+        var CURSOR_RIGHT = 530;
+        var CURSOR_TOP = 350;
+        var CURSOR_BOTTOM = 380;
+
+        var CURSOR_HOR_STEP = 10;
+        var CURSOR_VER_STEP = 1;
+
+        var cursor_hor = CURSOR_HOR_STEP;
+        var cursor_ver = CURSOR_VER_STEP;
+
+        var CURSOR_TIMER = 50;
+
+        var hand_top = 350;
+        var hand_left = 450;
+
+        var cursorTimerId = 0;
+        var dartTimerId = 1;
+
+        var firing = 0;
+        var aimingMode = false;
+
+        var wind_angle = 0;
+        var wind_phase = 0;
+
+        var WIND_CELL_COUNT = 20;
+        var WIND_TIMER = 300;
+
+        var wind_cell_x = [WIND_CELL_COUNT];
+        var wind_cell_y = [WIND_CELL_COUNT];
+
+        var gameAngle = 0;
+        var windStrenght = 0;
+
+        var sprite_cellwidth = 57;
+        var sprite_cellheight = 400;
+        var sprite_cellnum = 21;
+        var animId;
+
+        // Single player game variables
+        var playerScore = 0;
+        var roundNumber = 1;
+        var maxRounds = 3;
+        var gameActive = true;
+
+        // Mobile touch support
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        function initMobileControls() {
+            if (isMobile) {
+                // Add touch controls
+                var controlsDiv = document.createElement('div');
+                controlsDiv.id = 'touchControls';
+                controlsDiv.innerHTML = '<button id="aimButton">AIM</button><button id="fireButton">FIRE</button>';
+                document.body.appendChild(controlsDiv);
+
+                // Add touch event listeners
+                document.getElementById('aimButton').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    startVerticalCursorMovement();
+                });
+
+                document.getElementById('fireButton').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    stopVerticalCursorMovement();
+                });
+
+                // Add tap-to-aim functionality
+                document.getElementById('gameBox').addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    if (!aimingMode) {
+                        var rect = this.getBoundingClientRect();
+                        var scaleX = GAME_XRES / rect.width;
+                        var scaleY = GAME_YRES / rect.height;
+                        
+                        var touch = e.touches[0];
+                        var x = (touch.clientX - rect.left) * scaleX;
+                        var y = (touch.clientY - rect.top) * scaleY;
+                        
+                        // Move cursor to touch position
+                        hand_left = Math.max(CURSOR_LEFT, Math.min(CURSOR_RIGHT, x - HAND_REF_X));
+                        hand_top = Math.max(CURSOR_TOP, Math.min(CURSOR_BOTTOM, y));
+                        moveCursor(hand_left, hand_top);
+                    }
+                });
+
+                // Prevent default touch behaviors
+                document.addEventListener('touchmove', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+
+                document.addEventListener('touchstart', function(e) {
+                    if (e.target.tagName !== 'BUTTON') {
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+            }
+        }
+
+        function initGameUI() {
+            var uiDiv = document.createElement('div');
+            uiDiv.id = 'gameUI';
+            uiDiv.innerHTML = `
+                <h2>Darts Game</h2>
+                <div>Round: <span id="roundDisplay">${roundNumber}/${maxRounds}</span></div>
+                <div>Score: <span id="scoreDisplay">${playerScore}</span></div>
+                <div>Darts: <span id="dartsDisplay">${dartCount}</span></div>
+            `;
+            document.body.appendChild(uiDiv);
+        }
+
+        function updateGameUI() {
+            document.getElementById('roundDisplay').textContent = `${roundNumber}/${maxRounds}`;
+            document.getElementById('scoreDisplay').textContent = playerScore;
+            document.getElementById('dartsDisplay').textContent = dartCount;
+        }
+
+        function checkGameEnd() {
+            if (roundNumber > maxRounds) {
+                gameActive = false;
+                showGameOver();
+            }
+        }
+
+        function showGameOver() {
+            var gameOverScreen = document.createElement('div');
+            gameOverScreen.id = 'gameOverScreen';
+            gameOverScreen.innerHTML = `
+                <h1>Game Over!</h1>
+                <p>Final Score: ${playerScore}</p>
+                <p>Rounds Completed: ${roundNumber - 1}</p>
+                <button id="restartButton">Play Again</button>
+            `;
+            document.body.appendChild(gameOverScreen);
+            gameOverScreen.style.display = 'flex';
+            
+            document.getElementById('restartButton').addEventListener('click', restartGame);
+        }
+
+        function restartGame() {
+            playerScore = 0;
+            roundNumber = 1;
+            dartCount = 3;
+            gameActive = true;
+            
+            document.getElementById('gameOverScreen').remove();
+            updateGameUI();
+            
+            // Reset wind
+            generateAngle();
+            
+            // Reset cursor
+            initCursor();
+            startHorizontalCursorMovement();
+        }
+
+        function nextRound() {
+            roundNumber++;
+            dartCount = 3;
+            updateGameUI();
+            checkGameEnd();
+            
+            // Generate new wind for the next round
+            if (gameActive) {
+                generateAngle();
+            }
+        }
+
+        // All your existing functions remain the same...
+        function initWindIndicator(newAngle) {
+            var wi = document.getElementById("windIndicator");
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newShadow = document.createElement("div");
+                var divIdName = "shadow" + i;
+                newShadow.setAttribute("id", divIdName);
+                newShadow.setAttribute("class", "windCell");
+                wi.appendChild(newShadow);
+            }
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newCell = document.createElement("div");
+                var divIdName = "cell" + i;
+                newCell.setAttribute("id", divIdName);
+                newCell.setAttribute("class", "windCell");
+                wi.appendChild(newCell);
+            }
+
+            setWindAngle(newAngle);
+            startWindAnimation();
+        }
+
+        function setWindAngle(newAngle) {
+            wind_angle = newAngle;
+            var rad = newAngle * (Math.PI / 180);
+            var rad2 = rad - Math.PI;
+            var radius = 23;
+            var cx = 29;
+            var cy = 29;
+            var sx = Math.cos(rad2) * radius + cx;
+            var sy = Math.sin(rad2) * radius + cy;
+            var step = (radius * 2) / WIND_CELL_COUNT;
+            var stp = 0;
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var px = sx + Math.cos(rad) * stp;
+                var py = sy + Math.sin(rad) * stp;
+
+                var sh = document.getElementById("shadow" + i);
+                sh.style.top = Math.round(py) - 4 + "px";
+                sh.style.left = Math.round(px) - 4 + "px";
+
+                var cl = document.getElementById("cell" + i);
+                cl.style.top = Math.round(py) - 4 + "px";
+                cl.style.left = Math.round(px) - 4 + "px";
+
+                if (WIND_CELL_COUNT - i > windStrenght) {
+                    cl.style.backgroundPosition = "-9px 0px";
+                } else {
+                    cl.style.backgroundPosition = "-36px 0px";
+                }
+                stp += step;
+            }
+        }
+
+        function startWindAnimation() {
+            setInterval("doWindAnimation()", WIND_TIMER);
+        }
+
+        function doWindAnimation() {
+            wind_phase++;
+            if (wind_phase > 4) wind_phase = 0;
+
+            for (i = 0; i < windStrenght; i++) {
+                var state = (wind_phase + i) % 4;
+                var offset = -(9 + state * 9);
+
+                var cl = document.getElementById("cell" + (WIND_CELL_COUNT - windStrenght + i));
+                cl.style.backgroundPosition = offset + "px 0px";
+            }
+        }
+
+        function generateAngle() {
+            gameAngle = Math.round(360 * Math.random());
+            windStrenght = Math.round(15 * Math.random()) + 5;
+            setWindAngle(gameAngle);
+        }
+
+        function getWindXOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var xo = Math.cos(a) * windStrenght;
+            return Math.round(xo);
+        }
+
+        function getWindYOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var yo = Math.sin(a) * windStrenght;
+            return Math.round(yo);
+        }
+
+        function initPowerBar(xpos, ypos) {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "visible";
+            el.style.top = ypos + "px";
+            el.style.left = xpos + "px";
+
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "visible";
+            setPowerBarProgress(0);
+        }
+
+        function setPowerBarProgress(val) {
+            var el = document.getElementById("power");
+            el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+            el.style.top = 140 - val + "px";
+            el.style.height = 150 - (139 - val) + "px";
+        }
+
+        function hidePowerBar() {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "hidden";
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "hidden";
+        }
+
+        function initCursor() {
+            hand_left = CURSOR_LEFT;
+            hand_top = CURSOR_TOP;
+        }
+
+        function moveCursor(newX, newY) {
+            hand_left = newX;
+            hand_top = newY;
+            var dart = document.getElementById("handCursor");
+            dart.style.left = hand_left + "px";
+            dart.style.top = hand_top + "px";
+        }
+
+        function doHorizontalCursorMovement() {
+            hand_left += cursor_hor;
+
+            if (cursor_hor > 0 && hand_left >= CURSOR_RIGHT) {
+                hand_left = CURSOR_RIGHT;
+                cursor_hor *= -1;
+            }
+
+            if (cursor_hor < 0 && hand_left < CURSOR_LEFT) {
+                hand_left = CURSOR_LEFT;
+                cursor_hor *= -1;
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function doVerticalCursorMovement() {
+            hand_top += cursor_ver;
+
+            if (cursor_ver > 0 && hand_top > CURSOR_BOTTOM) {
+                hand_top = CURSOR_BOTTOM;
+                cursor_ver *= -1;
+            }
+
+            if (cursor_ver < 0 && hand_top < CURSOR_TOP) {
+                hand_top = CURSOR_TOP;
+                cursor_ver *= -1;
+            }
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                var prog = (hand_top - CURSOR_TOP) * (130 / (CURSOR_BOTTOM - CURSOR_TOP));
+                setPowerBarProgress(prog);
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function startHorizontalCursorMovement() {
+            initCursor();
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "0px 0px";
+            cursorTimerId = setInterval("doHorizontalCursorMovement()", CURSOR_TIMER);
+        }
+
+        function stopHorizontalCursorMovement() {
+            clearInterval(cursorTimerId);
+        }
+
+        function startVerticalCursorMovement() {
+            if (firing == 0 && gameActive) {
+                aimingMode = true;
+                stopHorizontalCursorMovement();
+                cursorTimerId = setInterval("doVerticalCursorMovement()", CURSOR_TIMER);
+                firing = 1;
+
+                if (SHOW_PROGRESS_BAR == 1) {
+                    initPowerBar(510, 130);
+                }
+
+                // Update button state on mobile
+                if (isMobile) {
+                    document.getElementById("aimButton").classList.add("active");
+                }
+            }
+        }
+
+        function stopVerticalCursorMovement() {
+            if (!gameActive) return;
+            
+            firing = 0;
+            aimingMode = false;
+            clearInterval(cursorTimerId);
+
+            var fireY = 360 - (hand_top - CURSOR_TOP) * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+            if (WIND_ACTIVE == 1) {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+            } else {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X, fireY);
+            }
+
+            initCursor();
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "-100px 0px";
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                hidePowerBar();
+            }
+
+            // Update button state on mobile
+            if (isMobile) {
+                document.getElementById("aimButton").classList.remove("active");
+            }
+
+            setTimeout("startHorizontalCursorMovement()", 500);
+        }
+
+        function mouseHandler(evt) {
+            if (isMobile) return; // Disable mouse events on mobile
+
+            var node = evt.target ? evt.target : evt.srcElement ? evt.srcElement : null;
+            evt = evt ? evt : event ? event : null;
+
+            var xpo = evt.clientX;
+            var ypo = evt.clientY;
+
+            var rx = xpo - 350;
+            var ry = ypo - 150;
+
+            computeHit(rx, ry);
+            generateScore();
+            addScoreA(totalScore);
+        }
+
+        function fireDart(tarX, tarY) {
+            var dart = document.getElementById("dart");
+            dart.style.left = tarX + "px";
+            dart.style.top = tarY + "px";
+            dart.style.visibility = "visible";
+
+            computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+            generateScore();
+            
+            // Add to player score
+            playerScore += totalScore;
+            
+            addScoreA(totalScore);
+
+            dartCount--;
+            if (dartCount == 0) {
+                nextRound();
+            }
+            updateGameUI();
+            renderIndicator();
+            doFlightAnim(0);
+        }
+
+        function generateScore() {
+            if (SEGMENT_NAMES[segmentType] == "out") {
+                totalScore = 0;
+            } else if (SEGMENT_NAMES[segmentType] == "50") {
+                totalScore = 50;
+            } else {
+                if (SEGMENT_NAMES[segmentType] == "25") {
+                    totalScore = 25;
+                } else {
+                    totalScore = SCORE_VALUES[segment];
+                    if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+                    if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+                }
+            }
+        }
+
+        function computeHit(xpos, ypos) {
+            var dx = BOARD_CENTER_X - xpos;
+            var dy = BOARD_CENTER_Y - ypos;
+            var angle = Math.atan2(dy, dx);
+            var delta = Math.sqrt(dx * dx + dy * dy);
+
+            var sg = 0;
+            for (i = 0; i < 6; i++) {
+                if (delta > SEGMENTS[i]) sg = i + 1;
+            }
+
+            segmentType = sg;
+            segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+            segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+        }
+
+        function addScoreA(msg) {
+            var ni = document.getElementById("scoreA");
+            var newpar = document.createElement("i");
+            newpar.innerHTML = "" + msg + "<br>";
+            ni.appendChild(newpar);
+
+            var objDiv = document.getElementById("scoreA");
+            objDiv.scrollTop = objDiv.scrollHeight;
+        }
+
+        function showcell(x, y, id) {
+            var el = document.getElementById(id);
+            var cx = -(x * sprite_cellwidth);
+            var cy = -(y * sprite_cellheight);
+            el.style.backgroundPosition = cx + "px " + cy + "px";
+        }
+
+        function doFlightAnim(step) {
+            dartTimerId = clearTimeout(animId);
+            if (step <= 20) {
+                showcell(step, 0, "dart");
+                dartTimerId = setTimeout("doFlightAnim(" + (step + 1) + ");", FLIGHT_ANIM_DELAY);
+            } else {
+                // Reset hand cursor to closed position after animation completes
+                var el = document.getElementById("handCursor");
+                el.style.backgroundPosition = "0px 0px";
+            }
+        }
+
+        function renderIndicator() {
+            var width = dartCount * 35;
+            var drt = document.getElementById("darts");
+            drt.style.width = width + "px";
+        }
+
+        // Responsive scaling function
+        function scaleGame() {
+            var gameBox = document.getElementById('gameBox');
+            var windowWidth = window.innerWidth;
+            var windowHeight = window.innerHeight;
+            
+            var scaleX = windowWidth / GAME_XRES;
+            var scaleY = windowHeight / GAME_YRES;
+            var scale = Math.min(scaleX, scaleY, 1);
+            
+            gameBox.style.transform = 'scale(' + scale + ')';
+            gameBox.style.transformOrigin = 'top left';
+        }
+
+        // Initialize everything
+        window.addEventListener('load', function() {
+            initGameUI();
+            initMobileControls();
+            startHorizontalCursorMovement();
+            initPowerBar(10, 10);
+            hidePowerBar();
+            initWindIndicator(45);
+            generateAngle();
+            scaleGame();
+        });
+
+        window.addEventListener('resize', scaleGame);
+
+        // Prevent zoom on double tap
+        var lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            var now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script> -->
+
+<!-- Working
+working
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Professional Darts Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: 'Orbitron', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.1), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.05), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(255, 255, 255, 0.1), transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.05), transparent);
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            animation: sparkle 20s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes sparkle {
+            0% { transform: translateY(0px) rotate(0deg); }
+            100% { transform: translateY(-200px) rotate(360deg); }
+        }
+
+        #gameBox {
+            position: relative;
+            width: 550px;
+            height: 400px;
+            background-image: url(media/beta-brd2.jpg);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            white-space: nowrap;
+            overflow: visible;
+            border-radius: 15px;
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                0 0 60px rgba(0, 255, 255, 0.1),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            z-index: 10;
+        }
+
+        #dart {
+            position: absolute;
+            visibility: hidden;
+            background-image: url(media/dart-flight.gif);
+            left: 300px;
+            width: 57px;
+            height: 400px;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+        }
+
+        /* #scoreA {
+            position: absolute;
+            left: 29px;
+            top: 135px;
+            width: 68px;
+            height: 155px;
+            text-align: center;
+            font-size: 14px;
+            color: #00ffff;
+            font-weight: bold;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            padding: 5px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        } */
+
+        #scoreA {
+    display: none; /* This hides it completely */
+}
+        #power-back {
+            position: absolute;
+            visibility: hidden;
+            left: 510px;
+            top: 130px;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            background-position: -36px 0px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+        }
+
+        #power {
+            position: absolute;
+            visibility: hidden;
+            left: 0;
+            top: 0;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            border-radius: 5px;
+        }
+
+        #darts {
+            position: absolute;
+            top: 488px;
+            left: 34px;
+            width: 115px;
+            height: 108px;
+            background-image: url(media/darts.png);
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+        }
+
+        #handCursor {
+            position: absolute;
+            top: 350px;
+            left: 450px;
+            width: 100px;
+            height: 114px;
+            background-image: url(media/hand-csr.gif);
+            filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.6));
+            transition: filter 0.3s ease;
+        }
+
+        /* #windIndicator {
+            position: absolute;
+            top: 11px;
+            left: 481px;
+            width: 58px;
+            height: 58px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+        }
+
+        .windCell {
+            position: absolute;
+            width: 9px;
+            height: 9px;
+            background-image: url(media/wind.gif);
+            border-radius: 50%;
+        } */
+
+        /* Professional Game UI */
+        #gameUI {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(0, 40, 80, 0.95));
+            color: #00ffff;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 16px;
+            min-width: 180px;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+        }
+
+        #gameUI h3 {
+            margin: 0 0 15px 0;
+            font-size: 20px;
+            text-align: center;
+            color: #ffff00;
+            text-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        #gameUI div {
+            margin: 8px 0;
+            padding: 2px 0;
+            width: 300px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #gameUI div:last-child {
+            border-bottom: none;
+        }
+
+        #gameUI span {
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);
+        }
+
+        /* Professional Mobile Controls */
+        #touchControls {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(0, 40, 80, 0.95));
+            padding: 20px;
+            border-radius: 20px;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+        }
+
+        .control-button {
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: all 0.2s ease;
+            user-select: none;
+            font-family: 'Orbitron', monospace;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .control-button:hover::before {
+            left: 100%;
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        #leftButton, #rightButton {
+            width: 55px;
+            height: 55px;
+            background: linear-gradient(135deg, #00bcd4, #0097a7);
+            color: white;
+            font-size: 22px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        #leftButton:hover, #rightButton:hover {
+            background: linear-gradient(135deg, #26c6da, #00acc1);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+        }
+
+        #aimButton {
+            width: 85px;
+            height: 55px;
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            font-size: 14px;
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            letter-spacing: 1px;
+        }
+
+        #aimButton:hover {
+            background: linear-gradient(135deg, #ef5350, #e53935);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+        }
+
+        #aimButton.aiming {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            border-color: rgba(0, 255, 0, 0.5);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 0, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 0, 0.9); }
+        }
+
+        #fireButton {
+            width: 85px;
+            height: 55px;
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+            font-size: 14px;
+            border: 2px solid rgba(255, 165, 0, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            letter-spacing: 1px;
+        }
+
+        #fireButton:hover {
+            background: linear-gradient(135deg, #ffb74d, #fb8c00);
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+        }
+
+        /* Professional Game Over Screen */
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(20, 20, 40, 0.95));
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #00ffff;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #gameOverScreen h1 {
+            font-size: 48px;
+            color: #ffff00;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+            font-weight: 700;
+            letter-spacing: 3px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 30px rgba(255, 255, 0, 0.8); }
+            to { text-shadow: 0 0 50px rgba(255, 255, 0, 1); }
+        }
+
+        #gameOverScreen p {
+            font-size: 24px;
+            margin: 15px 0;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+        }
+
+        #restartButton {
+            padding: 18px 35px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 6px 20px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(76, 175, 80, 0.5);
+        }
+
+        #restartButton:hover {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+            transform: translateY(-2px);
+            box-shadow: 
+                0 8px 25px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(76, 175, 80, 0.7);
+        }
+
+        #restartButton:active {
+            transform: translateY(0px);
+            box-shadow: 
+                0 4px 15px rgba(0, 0, 0, 0.3),
+                0 0 15px rgba(76, 175, 80, 0.5);
+        }
+
+        /* Responsive Design */
+        @media screen and (max-width: 600px) {
+            #gameBox {
+                transform: scale(0.85);
+            }
+            
+            #gameUI {
+                font-size: 14px;
+                padding: 15px;
+                min-width: 150px;
+            }
+            
+            #touchControls {
+                padding: 15px;
+                gap: 12px;
+            }
+            
+            .control-button {
+                font-size: 12px;
+            }
+            
+            #leftButton, #rightButton {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            
+            #aimButton, #fireButton {
+                width: 75px;
+                height: 50px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            #gameBox {
+                transform: scale(0.7);
+            }
+            
+            #gameUI {
+                top: 10px;
+                left: 10px;
+                font-size: 12px;
+            }
+            
+            #gameOverScreen h1 {
+                font-size: 36px;
+            }
+            
+            #gameOverScreen p {
+                font-size: 18px;
+            }
+        }
+
+        /* Custom scrollbar for score area */
+        #scoreA::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #scoreA::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 2px;
+        }
+
+        #scoreA::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 255, 0.6);
+            border-radius: 2px;
+        }
+
+        #scoreA::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 255, 0.8);
+        }
+    </style>
+   <script>
+        var SHOW_PROGRESS_BAR = 1;
+var WIND_ACTIVE = 1;
+
+
+var GAME_XRES = 550;
+var GAME_YRES = 400;
+
+
+var HAND_REF_X = 12;
+
+
+var BOARD_CENTER_X = 185;
+var BOARD_CENTER_Y = 199;
+var BOARD_RADIUS = 154;
+
+
+var OFFSET_POINT_X = 333;
+var OFFSET_POINT_Y = 176;
+
+
+var SEGMENT_COUNT = 20;
+var SEGMENT_SIZE = Math.PI / 10.0;
+
+
+// var SEGMENTS = [10, 21, 77, 90, 141, 154];
+// Scale up your segments to match your coordinate system
+var SEGMENTS = [15, 30, 120, 135, 210, 225]; // Adjusted for your coordinate system
+
+
+var SEGMENT_NAMES = ["50", "25", "value", "tripple", "value", "double", "out"];
+
+
+var angleOffset = Math.round(-Math.atan2(BOARD_CENTER_Y - OFFSET_POINT_Y, BOARD_CENTER_X - OFFSET_POINT_X) * (180.0 / Math.PI) + 180.0);
+
+
+var SCORE_VALUES = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6];
+
+
+var targetAngle = 0;
+var targetDelta = 0;
+var targetDX = 0;
+var targetDY = 0;
+
+
+var segmentIndex = 0;
+var segmentType = 0;
+var segmentAngle = 0;
+var segment = 0;
+var totalScore = 0;
+
+
+var DART_REF_X = 34;
+var DART_REF_Y = 66;
+
+
+var FLIGHT_ANIM_DELAY = 20;
+
+
+var dartCount = 3;
+var ligthOn = 0;
+
+
+var CURSOR_LEFT = 10;
+var CURSOR_RIGHT = 300;
+var CURSOR_TOP = 350;
+var CURSOR_BOTTOM = 380;
+
+
+var CURSOR_HOR_STEP = 15; // Movement step for manual controls
+var CURSOR_VER_STEP = 1;
+
+
+var cursor_ver = CURSOR_VER_STEP;
+var CURSOR_TIMER = 50;
+
+
+var hand_top = 350;
+var hand_left = 450;
+
+
+var cursorTimerId = 0;
+var dartTimerId = 1;
+
+
+var firing = 0;
+var aimingMode = false;
+var horizontalMovementActive = false; // New flag to control automatic movement
+
+
+var wind_angle = 0;
+var wind_phase = 0;
+
+
+var WIND_CELL_COUNT = 20;
+var WIND_TIMER = 300;
+
+
+var wind_cell_x = [WIND_CELL_COUNT];
+var wind_cell_y = [WIND_CELL_COUNT];
+
+
+var gameAngle = 0;
+var windStrenght = 0;
+
+
+var sprite_cellwidth = 57;
+var sprite_cellheight = 400;
+var sprite_cellnum = 21;
+var animId;
+
+
+// Single player game variables
+var playerScore = 0;
+var roundNumber = 1;
+var maxRounds = 1;
+var gameActive = true;
+
+
+
+// Mobile touch support
+var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+
+// Manual movement functions [web:6][web:43]
+function moveLeft() {
+    if (!aimingMode && !firing && gameActive) {
+        hand_left -= CURSOR_HOR_STEP;
+        if (hand_left < CURSOR_LEFT) {
+            hand_left = CURSOR_LEFT;
+        }
+        moveCursor(hand_left, hand_top);
+    }
+}
+
+
+function moveRight() {
+    if (!aimingMode && !firing && gameActive) {
+        hand_left += CURSOR_HOR_STEP;
+        if (hand_left > CURSOR_RIGHT) {
+            hand_left = CURSOR_RIGHT;
+        }
+        moveCursor(hand_left, hand_top);
+    }
+}
+
+
+function initMobileControls() {
+    // Add touch controls with left/right buttons [web:6][web:44]
+    var controlsDiv = document.createElement('div');
+    controlsDiv.id = 'touchControls';
+    
+    controlsDiv.innerHTML = `
+        <button id="leftButton" class="control-button">←</button>
+        <button id="rightButton" class="control-button">→</button>
+        <button id="aimButton" class="control-button">AIM</button>
+        <button id="fireButton" class="control-button">FIRE</button>
+    `;
+    
+    document.body.appendChild(controlsDiv);
+
+
+    // Add event listeners for manual movement [web:6][web:9]
+    var leftBtn = document.getElementById('leftButton');
+    var rightBtn = document.getElementById('rightButton');
+    var aimBtn = document.getElementById('aimButton');
+    var fireBtn = document.getElementById('fireButton');
+
+
+    // Left button events
+    leftBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        moveLeft();
+        leftBtn.style.transform = 'scale(0.95)';
+    });
+    leftBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        leftBtn.style.transform = 'scale(1)';
+    });
+    leftBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        moveLeft();
+    });
+
+
+    // Right button events
+    rightBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        moveRight();
+        rightBtn.style.transform = 'scale(0.95)';
+    });
+    rightBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        rightBtn.style.transform = 'scale(1)';
+    });
+    rightBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        moveRight();
+    });
+
+
+    // Aim button events
+    aimBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        startVerticalCursorMovement();
+        aimBtn.style.transform = 'scale(0.95)';
+    });
+    aimBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        aimBtn.style.transform = 'scale(1)';
+    });
+    aimBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        startVerticalCursorMovement();
+    });
+
+
+    // Fire button events
+    fireBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        stopVerticalCursorMovement();
+        fireBtn.style.transform = 'scale(0.95)';
+    });
+    fireBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        fireBtn.style.transform = 'scale(1)';
+    });
+    fireBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        stopVerticalCursorMovement();
+    });
+
+
+    // Prevent default touch behaviors [web:6]
+    document.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+    }, { passive: false });
+
+
+    document.addEventListener('touchstart', function(e) {
+        if (e.target.tagName !== 'BUTTON') {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+
+    // Add keyboard support for desktop testing [web:43]
+    document.addEventListener('keydown', function(e) {
+        switch(e.key) {
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+                e.preventDefault();
+                moveLeft();
+                break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+                e.preventDefault();
+                moveRight();
+                break;
+            case ' ':
+            case 'Enter':
+                e.preventDefault();
+                if (!aimingMode) {
+                    startVerticalCursorMovement();
+                } else {
+                    stopVerticalCursorMovement();
+                }
+                break;
+        }
+    });
+}
+
+    // <div>ROUND <span id="roundDisplay">${roundNumber}/${maxRounds}</span></div>
+function initGameUI() {
+    var uiDiv = document.createElement('div');
+    uiDiv.id = 'gameUI';
+    uiDiv.innerHTML = `
+        <h3>DART BOARD GAME</h3>
+    
+        <div>SCORE <span id="scoreDisplay">${playerScore}</span></div>
+        <div>DARTS <span id="dartsDisplay">${dartCount}</span></div>
+    `;
+    document.body.appendChild(uiDiv);
+}
+
+
+function updateGameUI() {
+    // document.getElementById('roundDisplay').textContent = `${roundNumber}/${maxRounds}`;
+    document.getElementById('scoreDisplay').textContent = playerScore;
+    document.getElementById('dartsDisplay').textContent = dartCount;
+}
+
+
+function checkGameEnd() {
+    if (roundNumber > maxRounds) {
+        gameActive = false;
+        showGameOver();
+    }
+}
+
+
+function showGameOver() {
+    var gameOverScreen = document.createElement('div');
+    gameOverScreen.id = 'gameOverScreen';
+    gameOverScreen.style.display = 'flex';
+    gameOverScreen.innerHTML = `
+        <h1>GAME COMPLETE</h1>
+        <p>FINAL SCORE: ${playerScore}</p>
+        <p>ROUNDS COMPLETED: ${roundNumber - 1}</p>
+        <button id="restartButton">PLAY AGAIN</button>
+    `;
+    document.body.appendChild(gameOverScreen);
+    
+    document.getElementById('restartButton').addEventListener('click', restartGame);
+}
+
+
+function restartGame() {
+    playerScore = 0;
+    roundNumber = 1;
+    dartCount = 3;
+    gameActive = true;
+    
+    document.getElementById('gameOverScreen').remove();
+    updateGameUI();
+    
+    // Reset wind
+    generateAngle();
+    
+    // Reset cursor position
+    initCursor();
+}
+
+
+function nextRound() {
+    roundNumber++;
+    dartCount = 3;
+    updateGameUI();
+    checkGameEnd();
+    
+    // Generate new wind for the next round
+    if (gameActive) {
+        generateAngle();
+    }
+}
+
+
+// Modified functions to remove automatic movement
+function initWindIndicator(newAngle) {
+    var wi = document.getElementById("windIndicator");
+
+
+    for (i = 0; i < WIND_CELL_COUNT; i++) {
+        var newShadow = document.createElement("div");
+        var divIdName = "shadow" + i;
+        newShadow.setAttribute("id", divIdName);
+        newShadow.setAttribute("class", "windCell");
+        wi.appendChild(newShadow);
+    }
+
+
+    for (i = 0; i < WIND_CELL_COUNT; i++) {
+        var newCell = document.createElement("div");
+        var divIdName = "cell" + i;
+        newCell.setAttribute("id", divIdName);
+        newCell.setAttribute("class", "windCell");
+        wi.appendChild(newCell);
+    }
+
+
+    setWindAngle(newAngle);
+    startWindAnimation();
+}
+
+
+function setWindAngle(newAngle) {
+    wind_angle = newAngle;
+    var rad = newAngle * (Math.PI / 180);
+    var rad2 = rad - Math.PI;
+    var radius = 23;
+    var cx = 29;
+    var cy = 29;
+    var sx = Math.cos(rad2) * radius + cx;
+    var sy = Math.sin(rad2) * radius + cy;
+    var step = (radius * 2) / WIND_CELL_COUNT;
+    var stp = 0;
+
+
+    for (i = 0; i < WIND_CELL_COUNT; i++) {
+        var px = sx + Math.cos(rad) * stp;
+        var py = sy + Math.sin(rad) * stp;
+
+
+        var sh = document.getElementById("shadow" + i);
+        sh.style.top = Math.round(py) - 4 + "px";
+        sh.style.left = Math.round(px) - 4 + "px";
+
+
+        var cl = document.getElementById("cell" + i);
+        cl.style.top = Math.round(py) - 4 + "px";
+        cl.style.left = Math.round(px) - 4 + "px";
+
+
+        if (WIND_CELL_COUNT - i > windStrenght) {
+            cl.style.backgroundPosition = "-9px 0px";
+        } else {
+            cl.style.backgroundPosition = "-36px 0px";
+        }
+        stp += step;
+    }
+}
+
+
+function startWindAnimation() {
+    setInterval("doWindAnimation()", WIND_TIMER);
+}
+
+
+function doWindAnimation() {
+    wind_phase++;
+    if (wind_phase > 4) wind_phase = 0;
+
+
+    for (i = 0; i < windStrenght; i++) {
+        var state = (wind_phase + i) % 4;
+        var offset = -(9 + state * 9);
+
+
+        var cl = document.getElementById("cell" + (WIND_CELL_COUNT - windStrenght + i));
+        cl.style.backgroundPosition = offset + "px 0px";
+    }
+}
+
+
+function generateAngle() {
+    gameAngle = Math.round(360 * Math.random());
+    windStrenght = Math.round(15 * Math.random()) + 5;
+    setWindAngle(gameAngle);
+}
+
+
+function getWindXOffset() {
+    var a = gameAngle * (Math.PI / 180) - Math.PI;
+    var xo = Math.cos(a) * windStrenght;
+    return Math.round(xo);
+}
+
+
+function getWindYOffset() {
+    var a = gameAngle * (Math.PI / 180) - Math.PI;
+    var yo = Math.sin(a) * windStrenght;
+    return Math.round(yo);
+}
+
+
+function initPowerBar(xpos, ypos) {
+    var el = document.getElementById("power-back");
+    el.style.visibility = "visible";
+    el.style.top = ypos + "px";
+    el.style.left = xpos + "px";
+
+
+    var el2 = document.getElementById("power");
+    el2.style.visibility = "visible";
+    setPowerBarProgress(0);
+}
+
+
+function setPowerBarProgress(val) {
+    var el = document.getElementById("power");
+    el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+    el.style.top = 140 - val + "px";
+    el.style.height = 150 - (139 - val) + "px";
+}
+
+
+function hidePowerBar() {
+    var el = document.getElementById("power-back");
+    el.style.visibility = "hidden";
+    var el2 = document.getElementById("power");
+    el2.style.visibility = "hidden";
+}
+
+
+function initCursor() {
+    hand_left = (CURSOR_LEFT + CURSOR_RIGHT) / 2; // Start in center
+    hand_top = CURSOR_TOP;
+    moveCursor(hand_left, hand_top);
+}
+
+
+function moveCursor(newX, newY) {
+    hand_left = newX;
+    hand_top = newY;
+    var dart = document.getElementById("handCursor");
+    dart.style.left = hand_left + "px";
+    dart.style.top = hand_top + "px";
+}
+
+
+// REMOVED: doHorizontalCursorMovement() - no longer needed for automatic movement
+
+
+function doVerticalCursorMovement() {
+    hand_top += cursor_ver;
+
+
+    if (cursor_ver > 0 && hand_top > CURSOR_BOTTOM) {
+        hand_top = CURSOR_BOTTOM;
+        cursor_ver *= -1;
+    }
+
+
+    if (cursor_ver < 0 && hand_top < CURSOR_TOP) {
+        hand_top = CURSOR_TOP;
+        cursor_ver *= -1;
+    }
+
+
+    if (SHOW_PROGRESS_BAR == 1) {
+        var prog = (hand_top - CURSOR_TOP) * (130 / (CURSOR_BOTTOM - CURSOR_TOP));
+        setPowerBarProgress(prog);
+    }
+
+
+    moveCursor(hand_left, hand_top);
+}
+
+
+// REMOVED: startHorizontalCursorMovement() and stopHorizontalCursorMovement()
+// These are no longer needed since we use manual controls
+
+
+function startVerticalCursorMovement() {
+    if (firing == 0 && gameActive) {
+        aimingMode = true;
+        cursorTimerId = setInterval("doVerticalCursorMovement()", CURSOR_TIMER);
+        firing = 1;
+
+
+        if (SHOW_PROGRESS_BAR == 1) {
+            initPowerBar(510, 130);
+        }
+
+
+        // Update button state
+        var aimBtn = document.getElementById("aimButton");
+        if (aimBtn) {
+            aimBtn.classList.add('aiming');
+            aimBtn.textContent = "AIMING...";
+        }
+    }
+}
+
+
+function stopVerticalCursorMovement() {
+    if (!gameActive) return;
+    
+    firing = 0;
+    aimingMode = false;
+    clearInterval(cursorTimerId);
+
+
+    var fireY = 360 - (hand_top - CURSOR_TOP) * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+
+    if (WIND_ACTIVE == 1) {
+        fireDart(hand_left - DART_REF_X + HAND_REF_X + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+    } else {
+        fireDart(hand_left - DART_REF_X + HAND_REF_X, fireY);
+    }
+
+
+    var el = document.getElementById("handCursor");
+    el.style.backgroundPosition = "-100px 0px";
+
+
+    if (SHOW_PROGRESS_BAR == 1) {
+        hidePowerBar();
+    }
+
+
+    // Update button state
+    var aimBtn = document.getElementById("aimButton");
+    if (aimBtn) {
+        aimBtn.classList.remove('aiming');
+        aimBtn.textContent = "AIM";
+    }
+}
+
+
+function mouseHandler(evt) {
+    if (isMobile) return; // Disable mouse events on mobile
+
+
+    var node = evt.target ? evt.target : evt.srcElement ? evt.srcElement : null;
+    evt = evt ? evt : event ? event : null;
+
+
+    var xpo = evt.clientX;
+    var ypo = evt.clientY;
+
+
+    var rx = xpo - 350;
+    var ry = ypo - 150;
+
+
+    computeHit(rx, ry);
+    generateScore();
+    addScoreA(totalScore);
+}
+
+
+function fireDart(tarX, tarY) {
+    var dart = document.getElementById("dart");
+    dart.style.left = tarX + "px";
+    dart.style.top = tarY + "px";
+    dart.style.visibility = "visible";
+
+
+    computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+    generateScore();
+    
+    // Add to player score
+    playerScore += totalScore;
+    
+    addScoreA(totalScore);
+
+
+    dartCount--;
+    if (dartCount == 0) {
+        nextRound();
+    }
+    updateGameUI();
+    renderIndicator();
+    doFlightAnim(0);
+}
+
+
+function generateScore() {
+    // Bounds checking
+    if (segmentType >= SEGMENT_NAMES.length) {
+        console.log("Error: segmentType out of bounds");
+        totalScore = 0;
+        return;
+    }
+    
+    if (segment >= SCORE_VALUES.length) {
+        console.log("Error: segment out of bounds");
+        totalScore = 0;
+        return;
+    }
+    
+    if (SEGMENT_NAMES[segmentType] == "out") {
+        totalScore = 0;
+    } else if (SEGMENT_NAMES[segmentType] == "50") {
+        totalScore = 50;
+    } else {
+        if (SEGMENT_NAMES[segmentType] == "25") {
+            totalScore = 25;
+        } else {
+            totalScore = SCORE_VALUES[segment];
+            if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+            if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+        }
+    }
+    
+    console.log(`Final calculation: ${SEGMENT_NAMES[segmentType]} = ${totalScore}`);
+}
+
+
+function computeHit(xpos, ypos) {
+    var dx = BOARD_CENTER_X - xpos;
+    var dy = BOARD_CENTER_Y - ypos;
+    var angle = Math.atan2(dy, dx);
+    var delta = Math.sqrt(dx * dx + dy * dy);
+
+
+    var sg = 0;
+    for (i = 0; i < 6; i++) {
+        if (delta > SEGMENTS[i]) sg = i + 1;
+    }
+
+
+    segmentType = sg;
+    segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+    segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+    
+    // Ensure segment is within bounds
+    if (segment < 0) segment = 0;
+    if (segment >= SCORE_VALUES.length) segment = SCORE_VALUES.length - 1;
+    
+    console.log(`Delta: ${delta}, SegType: ${segmentType}, SegName: ${SEGMENT_NAMES[segmentType]}`);
+    console.log(`Segment boundaries check:`);
+    for (let j = 0; j < SEGMENTS.length; j++) {
+        console.log(`  ${SEGMENTS[j]}: ${delta > SEGMENTS[j] ? 'YES' : 'NO'}`);
+    }
+
+
+       console.log(`Raw segment calculation: ${segmentIndex} → ${segment}`);
+    console.log(`SCORE_VALUES[${segment}] = ${SCORE_VALUES[segment]}`);
+    
+    // Ensure segment is within bounds
+    if (segment < 0 || segment >= SCORE_VALUES.length) {
+        console.log(`ERROR: segment ${segment} is out of bounds!`);
+        segment = Math.max(0, Math.min(segment, SCORE_VALUES.length - 1));
+    }
+}
+
+
+function addScoreA(msg) {
+    var ni = document.getElementById("scoreA");
+    var newpar = document.createElement("i");
+    newpar.innerHTML = "" + msg + "<br>";
+    ni.appendChild(newpar);
+
+
+    var objDiv = document.getElementById("scoreA");
+    objDiv.scrollTop = objDiv.scrollHeight;
+}
+
+
+function showcell(x, y, id) {
+    var el = document.getElementById(id);
+    var cx = -(x * sprite_cellwidth);
+    var cy = -(y * sprite_cellheight);
+    el.style.backgroundPosition = cx + "px " + cy + "px";
+}
+
+
+function doFlightAnim(step) {
+    dartTimerId = clearTimeout(animId);
+    if (step <= 20) {
+        showcell(step, 0, "dart");
+        dartTimerId = setTimeout("doFlightAnim(" + (step + 1) + ");", FLIGHT_ANIM_DELAY);
+    } else {
+        // Reset hand cursor to closed position after animation completes
+        var el = document.getElementById("handCursor");
+        el.style.backgroundPosition = "0px 0px";
+    }
+}
+
+
+function renderIndicator() {
+    var width = dartCount * 35;
+    var drt = document.getElementById("darts");
+    drt.style.width = width + "px";
+}
+
+
+// Responsive scaling function
+function scaleGame() {
+    var gameBox = document.getElementById('gameBox');
+    var windowWidth = window.innerWidth;
+    var windowHeight = window.innerHeight;
+    
+    var scaleX = windowWidth / GAME_XRES;
+    var scaleY = windowHeight / GAME_YRES;
+    var scale = Math.min(scaleX, scaleY, 1);
+    
+    gameBox.style.transform = 'scale(' + scale + ')';
+    gameBox.style.transformOrigin = 'top left';
+}
+
+
+// Initialize everything
+window.addEventListener('load', function() {
+    initGameUI();
+    initMobileControls();
+    // REMOVED: startHorizontalCursorMovement(); - no longer automatic
+    initCursor(); // Just position the cursor, don't start automatic movement
+    initPowerBar(10, 10);
+    hidePowerBar();
+    initWindIndicator(45);
+    generateAngle();
+    scaleGame();
+});
+
+
+window.addEventListener('resize', scaleGame);
+
+
+// Prevent zoom on double tap
+var lastTouchEnd = 0;
+document.addEventListener('touchend', function (event) {
+    var now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+
+
+</script>
+
+
+</head>
+
+
+<body onmouseup="mouseHandler(event)" onkeydown="startVerticalCursorMovement()" onkeyup="stopVerticalCursorMovement()">
+    <div id="gameBox">
+        <div id="windIndicator"></div>
+        <div id="darts"></div>
+        <div id="power-back" style="visibility: hidden; top: 10px; left: 10px">
+            <div id="power" style="visibility: hidden; background-position: 0px -139px; top: 140px; height: 11px;"></div>
+        </div>
+        <div id="handCursor" style="background-position: 0px 0px; left: 380px; top: 350px"></div>
+        <div id="scoreA"></div>
+        <div id="dart">&nbsp;</div>
+    </div>
+</body>
+</html> -->
+
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Professional Darts Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: 'Orbitron', monospace;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.1), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.05), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(255, 255, 255, 0.1), transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.05), transparent);
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            animation: sparkle 20s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes sparkle {
+            0% { transform: translateY(0px) rotate(0deg); }
+            100% { transform: translateY(-200px) rotate(360deg); }
+        }
+
+        /* Full screen GameBox with margins */
+        #gameBox {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: calc(100vw - 0.5cm);
+            height: calc(100vh - 3cm);
+            background-image: url(media/beta-brd2.jpg);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            white-space: nowrap;
+            overflow: visible;
+            border-radius: 0;
+            box-shadow: none;
+            z-index: 10;
+        }
+
+        #dart {
+            position: absolute;
+            visibility: hidden;
+            background-image: url(media/dart-flight.gif);
+            left: 300px;
+            width: 57px;
+            height: 400px;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+        }
+
+        #scoreA {
+            display: none;
+        }
+
+        /* Power bar positioned in the right 0.5cm area */
+        #power-back {
+            position: fixed;
+            visibility: hidden;
+            right: 0.1cm;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            background-position: -36px 0px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        #power {
+            position: absolute;
+            visibility: hidden;
+            left: 0;
+            top: 0;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            border-radius: 5px;
+        }
+
+        /* Darts indicator positioned in the 3cm bottom area */
+        #darts {
+            position: fixed;
+            bottom: 1.5cm;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 115px;
+            height: 108px;
+            background-image: url(media/darts.png);
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+            z-index: 1000;
+        }
+
+        /* Draggable hand cursor - horizontal movement only */
+        #handCursor {
+            position: absolute;
+            top: 80%;
+            left: 50%;
+            width: 100px;
+            height: 114px;
+            background-image: url(media/hand-csr.gif);
+            filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.6));
+            transition: filter 0.3s ease;
+            cursor: grab;
+            z-index: 500;
+        }
+
+        #handCursor:active {
+            cursor: grabbing;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 0, 0.8));
+        }
+
+        #windIndicator {
+            display: none;
+        }
+
+        .windCell {
+            display: none;
+        }
+
+        /* Simplified Mobile Controls - Only AIM and FIRE in bottom 3cm */
+        #touchControls {
+            position: fixed;
+            bottom: 0.3cm;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 1000;
+            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(0, 40, 80, 0.95));
+            padding: 15px 30px;
+            border-radius: 20px;
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+        }
+
+        .control-button {
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: all 0.2s ease;
+            user-select: none;
+            font-family: 'Orbitron', monospace;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .control-button:hover::before {
+            left: 100%;
+        }
+
+        .control-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        #aimButton {
+            width: 100px;
+            height: 60px;
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            font-size: 16px;
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            letter-spacing: 1px;
+        }
+
+        #aimButton:hover {
+            background: linear-gradient(135deg, #ef5350, #e53935);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+        }
+
+        #aimButton.aiming {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            border-color: rgba(0, 255, 0, 0.5);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 0, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 0, 0.9); }
+        }
+
+        #fireButton {
+            width: 100px;
+            height: 60px;
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+            font-size: 16px;
+            border: 2px solid rgba(255, 165, 0, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            letter-spacing: 1px;
+        }
+
+        #fireButton:hover {
+            background: linear-gradient(135deg, #ffb74d, #fb8c00);
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+        }
+
+        /* Professional Game Over Screen */
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(20, 20, 40, 0.95));
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #00ffff;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #gameOverScreen h1 {
+            font-size: 48px;
+            color: #ffff00;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+            font-weight: 700;
+            letter-spacing: 3px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 30px rgba(255, 255, 0, 0.8); }
+            to { text-shadow: 0 0 50px rgba(255, 255, 0, 1); }
+        }
+
+        #gameOverScreen p {
+            font-size: 24px;
+            margin: 15px 0;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+        }
+
+        #restartButton {
+            padding: 18px 35px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 6px 20px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(76, 175, 80, 0.5);
+        }
+
+        #restartButton:hover {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+            transform: translateY(-2px);
+            box-shadow: 
+                0 8px 25px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(76, 175, 80, 0.7);
+        }
+
+        #restartButton:active {
+            transform: translateY(0px);
+            box-shadow: 
+                0 4px 15px rgba(0, 0, 0, 0.3),
+                0 0 15px rgba(76, 175, 80, 0.5);
+        }
+
+        /* Responsive Design */
+        @media screen and (max-width: 600px) {
+            #touchControls {
+                padding: 10px 20px;
+                gap: 15px;
+            }
+            
+            #aimButton, #fireButton {
+                width: 80px;
+                height: 50px;
+                font-size: 14px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            #gameOverScreen h1 {
+                font-size: 36px;
+            }
+            
+            #gameOverScreen p {
+                font-size: 18px;
+            }
+        }
+    </style>
+   <script>
+        var SHOW_PROGRESS_BAR = 1;
+        var WIND_ACTIVE = 0; // Disabled wind
+
+        // Dynamic game dimensions
+        var GAME_XRES = window.innerWidth;
+        var GAME_YRES = window.innerHeight;
+
+        var HAND_REF_X = 12;
+
+        var BOARD_CENTER_X = window.innerWidth / 2;
+        var BOARD_CENTER_Y = window.innerHeight / 2;
+        var BOARD_RADIUS = 154;
+
+        var OFFSET_POINT_X = BOARD_CENTER_X;
+        var OFFSET_POINT_Y = BOARD_CENTER_Y;
+
+        var SEGMENT_COUNT = 20;
+        var SEGMENT_SIZE = Math.PI / 10.0;
+
+        var SEGMENTS = [15, 30, 120, 135, 210, 225];
+        var SEGMENT_NAMES = ["50", "25", "value", "tripple", "value", "double", "out"];
+
+        var angleOffset = Math.round(-Math.atan2(BOARD_CENTER_Y - OFFSET_POINT_Y, BOARD_CENTER_X - OFFSET_POINT_X) * (180.0 / Math.PI) + 180.0);
+
+        var SCORE_VALUES = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6];
+
+        var targetAngle = 0;
+        var targetDelta = 0;
+        var targetDX = 0;
+        var targetDY = 0;
+
+        var segmentIndex = 0;
+        var segmentType = 0;
+        var segmentAngle = 0;
+        var segment = 0;
+        var totalScore = 0;
+
+        var DART_REF_X = 34;
+        var DART_REF_Y = 66;
+
+        var FLIGHT_ANIM_DELAY = 20;
+
+        var dartCount = 3;
+        var ligthOn = 0;
+
+        // Updated cursor boundaries for horizontal-only movement
+        var CURSOR_LEFT = 50;
+        var CURSOR_RIGHT = window.innerWidth - 150;
+        var CURSOR_TOP = window.innerHeight * 0.8;
+        var CURSOR_BOTTOM = window.innerHeight * 0.8; // Same as top for horizontal-only
+
+        var CURSOR_VER_STEP = 1;
+        var cursor_ver = CURSOR_VER_STEP;
+        var CURSOR_TIMER = 50;
+
+        var hand_top = window.innerHeight * 0.8;
+        var hand_left = window.innerWidth / 2;
+
+        var cursorTimerId = 0;
+        var dartTimerId = 1;
+
+        var firing = 0;
+        var aimingMode = false;
+
+        // Horizontal-only drag functionality variables
+        var isDragging = false;
+        var dragStartX = 0;
+        var dragOffsetX = 0;
+
+        var sprite_cellwidth = 57;
+        var sprite_cellheight = 400;
+        var sprite_cellnum = 21;
+        var animId;
+
+        // Single player game variables
+        var playerScore = 0;
+        var roundNumber = 1;
+        var maxRounds = 1;
+        var gameActive = true;
+
+        // Mobile touch support
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // Horizontal-only drag functionality for hand cursor
+        function initDragFunctionality() {
+            var handCursor = document.getElementById('handCursor');
+            
+            // Mouse events
+            handCursor.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+            
+            // Touch events
+            handCursor.addEventListener('touchstart', startDragTouch);
+            document.addEventListener('touchmove', dragTouch);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function startDrag(e) {
+            if (aimingMode || firing) return;
+            e.preventDefault();
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragOffsetX = e.clientX - hand_left;
+        }
+
+        function startDragTouch(e) {
+            if (aimingMode || firing) return;
+            e.preventDefault();
+            isDragging = true;
+            var touch = e.touches[0];
+            dragStartX = touch.clientX;
+            dragOffsetX = touch.clientX - hand_left;
+        }
+
+        function drag(e) {
+            if (!isDragging || aimingMode || firing) return;
+            e.preventDefault();
+            
+            var newX = e.clientX - dragOffsetX;
+            
+            // Boundary checking - horizontal only
+            newX = Math.max(CURSOR_LEFT, Math.min(newX, CURSOR_RIGHT));
+            
+            // Keep Y position fixed for horizontal-only movement
+            moveCursor(newX, hand_top);
+        }
+
+        function dragTouch(e) {
+            if (!isDragging || aimingMode || firing) return;
+            e.preventDefault();
+            
+            var touch = e.touches[0];
+            var newX = touch.clientX - dragOffsetX;
+            
+            // Boundary checking - horizontal only
+            newX = Math.max(CURSOR_LEFT, Math.min(newX, CURSOR_RIGHT));
+            
+            // Keep Y position fixed for horizontal-only movement
+            moveCursor(newX, hand_top);
+        }
+
+        function stopDrag(e) {
+            isDragging = false;
+        }
+
+        function initMobileControls() {
+            var controlsDiv = document.createElement('div');
+            controlsDiv.id = 'touchControls';
+            
+            controlsDiv.innerHTML = `
+                <button id="aimButton" class="control-button">AIM</button>
+                <button id="fireButton" class="control-button">FIRE</button>
+            `;
+            
+            document.body.appendChild(controlsDiv);
+
+            var aimBtn = document.getElementById('aimButton');
+            var fireBtn = document.getElementById('fireButton');
+
+            // Aim button events
+            aimBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                startVerticalCursorMovement();
+                aimBtn.style.transform = 'scale(0.95)';
+            });
+            aimBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                aimBtn.style.transform = 'scale(1)';
+            });
+            aimBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                startVerticalCursorMovement();
+            });
+
+            // Fire button events
+            fireBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                stopVerticalCursorMovement();
+                fireBtn.style.transform = 'scale(0.95)';
+            });
+            fireBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                fireBtn.style.transform = 'scale(1)';
+            });
+            fireBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                stopVerticalCursorMovement();
+            });
+
+            // Keyboard support for desktop testing
+            document.addEventListener('keydown', function(e) {
+                switch(e.key) {
+                    case ' ':
+                    case 'Enter':
+                        e.preventDefault();
+                        if (!aimingMode) {
+                            startVerticalCursorMovement();
+                        } else {
+                            stopVerticalCursorMovement();
+                        }
+                        break;
+                }
+            });
+        }
+
+        function checkGameEnd() {
+            if (roundNumber > maxRounds) {
+                gameActive = false;
+                showGameOver();
+            }
+        }
+
+        function showGameOver() {
+            var gameOverScreen = document.createElement('div');
+            gameOverScreen.id = 'gameOverScreen';
+            gameOverScreen.style.display = 'flex';
+            gameOverScreen.innerHTML = `
+                <h1>GAME COMPLETE</h1>
+                <p>FINAL SCORE: ${playerScore}</p>
+                <p>ROUNDS COMPLETED: ${roundNumber - 1}</p>
+                <button id="restartButton">PLAY AGAIN</button>
+            `;
+            document.body.appendChild(gameOverScreen);
+            
+            document.getElementById('restartButton').addEventListener('click', restartGame);
+        }
+
+        function restartGame() {
+            playerScore = 0;
+            roundNumber = 1;
+            dartCount = 3;
+            gameActive = true;
+            
+            document.getElementById('gameOverScreen').remove();
+            initCursor();
+        }
+
+        function nextRound() {
+            roundNumber++;
+            dartCount = 3;
+            
+            if (gameActive) {
+                // Generate new round if needed
+            }
+        }
+
+        function initPowerBar() {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "visible";
+        }
+
+        function setPowerBarProgress(val) {
+            var el = document.getElementById("power");
+            el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+            el.style.top = 140 - val + "px";
+            el.style.height = 150 - (139 - val) + "px";
+        }
+
+        function hidePowerBar() {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "hidden";
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "hidden";
+        }
+
+        function initCursor() {
+            hand_left = window.innerWidth / 2;
+            hand_top = window.innerHeight * 0.8;
+            moveCursor(hand_left, hand_top);
+        }
+
+        function moveCursor(newX, newY) {
+            hand_left = newX;
+            hand_top = newY;
+            var cursor = document.getElementById("handCursor");
+            cursor.style.left = hand_left + "px";
+            cursor.style.top = hand_top + "px";
+        }
+
+        function doVerticalCursorMovement() {
+            hand_top += cursor_ver;
+
+            if (cursor_ver > 0 && hand_top > CURSOR_BOTTOM) {
+                hand_top = CURSOR_BOTTOM;
+                cursor_ver *= -1;
+            }
+
+            if (cursor_ver < 0 && hand_top < CURSOR_TOP) {
+                hand_top = CURSOR_TOP;
+                cursor_ver *= -1;
+            }
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                var prog = (hand_top - CURSOR_TOP) * (130 / (CURSOR_BOTTOM - CURSOR_TOP));
+                setPowerBarProgress(prog);
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function startVerticalCursorMovement() {
+            if (firing == 0 && gameActive) {
+                aimingMode = true;
+                cursorTimerId = setInterval("doVerticalCursorMovement()", CURSOR_TIMER);
+                firing = 1;
+
+                if (SHOW_PROGRESS_BAR == 1) {
+                    initPowerBar();
+                }
+
+                var aimBtn = document.getElementById("aimButton");
+                if (aimBtn) {
+                    aimBtn.classList.add('aiming');
+                    aimBtn.textContent = "AIMING...";
+                }
+            }
+        }
+
+        function stopVerticalCursorMovement() {
+            if (!gameActive) return;
+            
+            firing = 0;
+            aimingMode = false;
+            clearInterval(cursorTimerId);
+
+            var fireY = hand_top - DART_REF_Y;
+            fireDart(hand_left - DART_REF_X + HAND_REF_X, fireY);
+
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "-100px 0px";
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                hidePowerBar();
+            }
+
+            var aimBtn = document.getElementById("aimButton");
+            if (aimBtn) {
+                aimBtn.classList.remove('aiming');
+                aimBtn.textContent = "AIM";
+            }
+        }
+
+        function fireDart(tarX, tarY) {
+            var dart = document.getElementById("dart");
+            dart.style.left = tarX + "px";
+            dart.style.top = tarY + "px";
+            dart.style.visibility = "visible";
+
+            computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+            generateScore();
+            
+            playerScore += totalScore;
+
+            dartCount--;
+            if (dartCount == 0) {
+                nextRound();
+            }
+            renderIndicator();
+            doFlightAnim(0);
+        }
+
+        function generateScore() {
+            if (segmentType >= SEGMENT_NAMES.length) {
+                totalScore = 0;
+                return;
+            }
+            
+            if (segment >= SCORE_VALUES.length) {
+                totalScore = 0;
+                return;
+            }
+            
+            if (SEGMENT_NAMES[segmentType] == "out") {
+                totalScore = 0;
+            } else if (SEGMENT_NAMES[segmentType] == "50") {
+                totalScore = 50;
+            } else {
+                if (SEGMENT_NAMES[segmentType] == "25") {
+                    totalScore = 25;
+                } else {
+                    totalScore = SCORE_VALUES[segment];
+                    if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+                    if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+                }
+            }
+        }
+
+        function computeHit(xpos, ypos) {
+            var dx = BOARD_CENTER_X - xpos;
+            var dy = BOARD_CENTER_Y - ypos;
+            var angle = Math.atan2(dy, dx);
+            var delta = Math.sqrt(dx * dx + dy * dy);
+
+            var sg = 0;
+            for (i = 0; i < 6; i++) {
+                if (delta > SEGMENTS[i]) sg = i + 1;
+            }
+
+            segmentType = sg;
+            segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+            segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+            
+            if (segment < 0) segment = 0;
+            if (segment >= SCORE_VALUES.length) segment = SCORE_VALUES.length - 1;
+        }
+
+        function showcell(x, y, id) {
+            var el = document.getElementById(id);
+            var cx = -(x * sprite_cellwidth);
+            var cy = -(y * sprite_cellheight);
+            el.style.backgroundPosition = cx + "px " + cy + "px";
+        }
+
+        function doFlightAnim(step) {
+            dartTimerId = clearTimeout(animId);
+            if (step <= 20) {
+                showcell(step, 0, "dart");
+                dartTimerId = setTimeout("doFlightAnim(" + (step + 1) + ");", FLIGHT_ANIM_DELAY);
+            } else {
+                var el = document.getElementById("handCursor");
+                el.style.backgroundPosition = "0px 0px";
+            }
+        }
+
+        function renderIndicator() {
+            var width = dartCount * 35;
+            var drt = document.getElementById("darts");
+            drt.style.width = width + "px";
+        }
+
+        function updateGameDimensions() {
+            GAME_XRES = window.innerWidth;
+            GAME_YRES = window.innerHeight;
+            BOARD_CENTER_X = window.innerWidth / 2;
+            BOARD_CENTER_Y = window.innerHeight / 2;
+            CURSOR_RIGHT = window.innerWidth - 150;
+            CURSOR_TOP = window.innerHeight * 0.8;
+            CURSOR_BOTTOM = window.innerHeight * 0.8;
+        }
+
+        // Initialize everything
+        window.addEventListener('load', function() {
+            updateGameDimensions();
+            initMobileControls();
+            initDragFunctionality();
+            initCursor();
+            initPowerBar();
+            hidePowerBar();
+        });
+
+        window.addEventListener('resize', function() {
+            updateGameDimensions();
+            initCursor();
+        });
+
+        // Prevent zoom on double tap
+        var lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            var now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+    </script>
+</head>
+
+<body>
+    <div id="gameBox">
+        <div id="darts"></div>
+        <div id="power-back" style="visibility: hidden;">
+            <div id="power" style="visibility: hidden; background-position: 0px -139px; top: 140px; height: 11px;"></div>
+        </div>
+        <div id="handCursor" style="background-position: 0px 0px;"></div>
+        <div id="scoreA"></div>
+        <div id="dart">&nbsp;</div>
+    </div>
+</body>
+</html> -->
+
+//1610 morning
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <title>Darts Game</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+
+      :root {
+        /* Physical margins: use cm so it matches your spec */
+        --bottom-safe: 3cm;
+        --right-safe: 0.5cm;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        background: linear-gradient(
+          135deg,
+          #0f0f23 0%,
+          #1a1a2e 50%,
+          #16213e 100%
+        );
+        font-family: "Orbitron", monospace;
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+      }
+
+      /* Animated background particles */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(
+            2px 2px at 20px 30px,
+            rgba(255, 255, 255, 0.1),
+            transparent
+          ),
+          radial-gradient(
+            2px 2px at 40px 70px,
+            rgba(255, 255, 255, 0.05),
+            transparent
+          ),
+          radial-gradient(
+            1px 1px at 90px 40px,
+            rgba(255, 255, 255, 0.1),
+            transparent
+          ),
+          radial-gradient(
+            1px 1px at 130px 80px,
+            rgba(255, 255, 255, 0.05),
+            transparent
+          );
+        background-repeat: repeat;
+        background-size: 200px 200px;
+        animation: sparkle 20s linear infinite;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      @keyframes sparkle {
+        0% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        100% {
+          transform: translateY(-200px) rotate(360deg);
+        }
+      }
+
+      /* Fullscreen game area with reserved bottom/right margins */
+      #gameBox {
+        position: fixed;
+        /* top: 10px; */
+        left: 18px;
+        bottom: 100px;
+        /* Occupy full screen minus the safe areas */
+        width: calc(95vw - var(--right-safe));
+        height: calc(100vh - var(--bottom-safe));
+        background-image: url(media/beta-brd2.jpg);
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        white-space: nowrap;
+        overflow: visible;
+        border-radius: 15px;
+        /* box-shadow: 0 0 30px rgba(0, 255, 255, 0.3),
+          0 0 60px rgba(0, 255, 255, 0.1),
+          inset 0 0 20px rgba(255, 255, 255, 0.05); */
+        z-index: 10;
+      }
+
+      /* Dart flight sprite */
+      #dart {
+        position: absolute;
+        visibility: hidden;
+        background-image: url(media/dart-flight.gif);
+        left: 300px;
+        width: 57px;
+        height: 400px;
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+      }
+
+      /* Hide legacy score list */
+      #scoreA {
+        display: none;
+      }
+
+      /* Power bar pinned near the right-safe gutter */
+      #power-back {
+        position: absolute;
+        visibility: hidden;
+        right: 8px; /* stays inside the 0.5cm gutter visually */
+        top: 150px;
+        width: 36px;
+        height: 150px;
+        background-image: url(media/pbar.gif);
+        background-position: -36px 0px;
+        border-radius: 5px;
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+      }
+
+      #power {
+        position: absolute;
+        visibility: hidden;
+        left: 0;
+        top: 0;
+        width: 36px;
+        height: 150px;
+        background-image: url(media/pbar.gif);
+        border-radius: 5px;
+      }
+
+      /* Darts indicator stays above the 3cm bottom */
+      #darts {
+        position: absolute;
+        /* bottom: 0px; */
+        top: 620px;
+        left: 10px;
+        width: 115px;
+        height: 108px;
+        background-image: url(media/darts.png);
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+        transform: scale(0.6);
+        transform-origin: left top;
+      }
+
+      /* Hand cursor starts near bottom area but inside gameBox */
+      #handCursor {
+        position: absolute;
+        bottom: 80px; /* align relative to gameBox bottom */
+        left: 450px;
+        width: 100px;
+        height: 114px;
+        background-image: url(media/hand-csr.gif);
+        filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.6));
+        transition: filter 0.2s ease;
+        touch-action: none; /* for smooth dragging */
+        cursor: grab;
+      }
+      #handCursor.dragging {
+        cursor: grabbing;
+      }
+
+      /* Wind indicator column on the right edge inside the 0.5cm gutter */
+      #windIndicator {
+        /* position: absolute;
+            top: 11px;
+            right: 8px;
+            width: 58px;
+            height: 58px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 255, 0.5); */
+        display: none;
+      }
+      .windCell {
+        /* position: absolute;
+            width: 9px;
+            height: 9px;
+            background-image: url(media/wind.gif);
+            border-radius: 50%; */
+        display: none;
+      }
+
+      /* Game UI (score) */
+      #gameUI {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 20, 40, 0.95),
+          rgba(0, 40, 80, 0.95)
+        );
+        color: #00ffff;
+        padding: 20px;
+        border-radius: 15px;
+        font-size: 16px;
+        min-width: 180px;
+        border: 2px solid rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+          inset 0 0 20px rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+      }
+      #gameUI h3 {
+        margin: 0 0 15px 0;
+        font-size: 20px;
+        text-align: center;
+        color: #ffff00;
+        text-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
+        font-weight: 700;
+        letter-spacing: 2px;
+      }
+      #gameUI div {
+        margin: 8px 0;
+        padding: 2px 0;
+        width: 300px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        display: flex;
+        justify-content: space-between;
+      }
+      #gameUI div:last-child {
+        border-bottom: none;
+      }
+      #gameUI span {
+        font-weight: bold;
+        color: #ffff00;
+        text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);
+      }
+
+      /* Add to your existing <style> */
+      #hitMessage {
+        position: absolute;
+        top: 50px; /* above dart board center */
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 50;
+        font-family: "Orbitron", monospace;
+        font-weight: 700;
+        font-size: 32px;
+        color: #00ffff;
+        text-shadow: 0 0 8px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      /* Touch controls: keep only AIM/FIRE aligned with darts above the bottom safe area */
+      #touchControls {
+        position: fixed;
+        left: 140px;
+        bottom: calc(
+          var(--bottom-safe) - 70px
+        ); /* slightly above the safe edge */
+        display: flex;
+        gap: 15px;
+        z-index: 1000;
+        /* background: linear-gradient(
+          135deg,
+          rgba(0, 20, 40, 0.95),
+          rgba(0, 40, 80, 0.95)
+        ); */
+        padding: 10px 10px;
+        border-radius: 20px;
+        /* border: 2px solid rgba(0, 255, 255, 0.5); */
+        /* box-shadow: 0 0 30px rgba(0, 255, 255, 0.3),
+          inset 0 0 20px rgba(255, 255, 255, 0.05); */
+        backdrop-filter: blur(15px);
+      }
+      .control-button {
+        border: none;
+        border-radius: 12px;
+        font-weight: bold;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: all 0.2s ease;
+        user-select: none;
+        font-family: "Orbitron", monospace;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+      }
+      .control-button::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.5s ease;
+      }
+      .control-button:hover::before {
+        left: 100%;
+      }
+      .control-button:active {
+        transform: scale(0.95);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+      #aimButton {
+        width: 95px;
+        height: 55px;
+        background: linear-gradient(135deg, #f44336, #d32f2f);
+        color: white;
+        font-size: 14px;
+        border: 2px solid rgba(255, 0, 0, 0.5);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        letter-spacing: 1px;
+      }
+      #aimButton:hover {
+        background: linear-gradient(135deg, #ef5350, #e53935);
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+      }
+      #aimButton.aiming {
+        background: linear-gradient(135deg, #4caf50, #388e3c);
+        border-color: rgba(0, 255, 0, 0.5);
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+        50% {
+          box-shadow: 0 0 30px rgba(0, 255, 0, 0.9);
+        }
+      }
+      #fireButton {
+        width: 95px;
+        height: 55px;
+        background: linear-gradient(135deg, #ff9800, #f57c00);
+        color: white;
+        font-size: 14px;
+        border: 2px solid rgba(255, 165, 0, 0.5);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        letter-spacing: 1px;
+      }
+      #fireButton:hover {
+        background: linear-gradient(135deg, #ffb74d, #fb8c00);
+        box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+      }
+
+      /* Game Over */
+      #gameOverScreen {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 0, 0, 0.9),
+          rgba(20, 20, 40, 0.95)
+        );
+        z-index: 2000;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: #00ffff;
+        text-align: center;
+        backdrop-filter: blur(10px);
+      }
+      #gameOverScreen h1 {
+        font-size: 48px;
+        color: #ffff00;
+        margin-bottom: 30px;
+        text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+        font-weight: 700;
+        letter-spacing: 3px;
+        animation: glow 2s ease-in-out infinite alternate;
+      }
+      @keyframes glow {
+        from {
+          text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+        }
+        to {
+          text-shadow: 0 0 50px rgba(255, 255, 0, 1);
+        }
+      }
+      #gameOverScreen p {
+        font-size: 24px;
+        margin: 15px 0;
+        text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+      }
+      #restartButton {
+        padding: 18px 35px;
+        margin-top: 30px;
+        background: linear-gradient(135deg, #4caf50, #388e3c);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        font-family: "Orbitron", monospace;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3),
+          0 0 20px rgba(76, 175, 80, 0.5);
+      }
+      #restartButton:hover {
+        background: linear-gradient(135deg, #66bb6a, #4caf50);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4),
+          0 0 30px rgba(76, 175, 80, 0.7);
+      }
+
+      /* Responsive tweaks */
+      @media screen and (max-width: 600px) {
+        #gameUI {
+          font-size: 14px;
+          padding: 15px;
+          min-width: 150px;
+        }
+        #touchControls {
+          padding: 14px;
+          gap: 12px;
+        }
+        .control-button {
+          font-size: 12px;
+        }
+        #aimButton,
+        #fireButton {
+          width: 85px;
+          height: 50px;
+        }
+      }
+      @media screen and (max-width: 480px) {
+        #gameUI {
+          top: 10px;
+          left: 10px;
+          font-size: 12px;
+        }
+        #gameOverScreen h1 {
+          font-size: 36px;
+        }
+        #gameOverScreen p {
+          font-size: 18px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="gameBox">
+      <div id="windIndicator"></div>
+      <!-- Add this inside #gameBox just above the dart element -->
+      <div id="hitMessage"></div>
+
+      <div id="darts"></div>
+
+      <!-- Power bar sits inside right gutter -->
+      <div id="power-back">
+        <div id="power" style="background-position: 0px -139px"></div>
+      </div>
+
+      <div id="handCursor" style="background-position: 0px 0px"></div>
+      <div id="scoreA"></div>
+      <div id="dart">&nbsp;</div>
+    </div>
+
+    <script>
+      var SHOW_PROGRESS_BAR = 1;
+      var WIND_ACTIVE = 1;
+
+      /* Game plane (old logical resolution kept for math, visuals now stretch to fullscreen) */
+      var GAME_XRES = 550;
+      var GAME_YRES = 400;
+
+      var HAND_REF_X = 12;
+
+      var BOARD_CENTER_X = 185;
+      var BOARD_CENTER_Y = 199;
+      var BOARD_RADIUS = 154;
+
+      var OFFSET_POINT_X = 333;
+      var OFFSET_POINT_Y = 176;
+
+      var SEGMENT_COUNT = 20;
+      var SEGMENT_SIZE = Math.PI / 10.0;
+
+      var SEGMENTS = [15, 30, 120, 135, 210, 225];
+      var SEGMENT_NAMES = [
+        "50",
+        "25",
+        "value",
+        "tripple",
+        "value",
+        "double",
+        "out",
+      ];
+
+      var angleOffset = Math.round(
+        -Math.atan2(
+          BOARD_CENTER_Y - OFFSET_POINT_Y,
+          BOARD_CENTER_X - OFFSET_POINT_X
+        ) *
+          (180.0 / Math.PI) +
+          180.0
+      );
+
+      var SCORE_VALUES = [
+        6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10,
+        6,
+      ];
+
+      var targetAngle = 0;
+      var targetDelta = 0;
+      var targetDX = 0;
+      var targetDY = 0;
+
+      var segmentIndex = 0;
+      var segmentType = 0;
+      var segmentAngle = 0;
+      var segment = 0;
+      var totalScore = 0;
+
+      var DART_REF_X = 34;
+      var DART_REF_Y = 66;
+
+      var FLIGHT_ANIM_DELAY = 20;
+
+      var dartCount = 3;
+
+      var CURSOR_LEFT = 10;
+      var CURSOR_RIGHT = 500;
+      var CURSOR_TOP = 350;
+      var CURSOR_BOTTOM = 380;
+
+      var CURSOR_HOR_STEP = 15;
+      var CURSOR_VER_STEP = 1;
+
+      var cursor_ver = CURSOR_VER_STEP;
+      var CURSOR_TIMER = 50;
+
+      var hand_top = 350;
+      var hand_left = 450;
+
+      var cursorTimerId = 0;
+      var dartTimerId = 1;
+
+      var firing = 0;
+      var aimingMode = false;
+
+      var wind_angle = 0;
+      var wind_phase = 0;
+
+      var WIND_CELL_COUNT = 20;
+      var WIND_TIMER = 300;
+
+      var gameAngle = 0;
+      var windStrenght = 0;
+
+      var sprite_cellwidth = 57;
+      var sprite_cellheight = 400;
+      var sprite_cellnum = 21;
+      var animId;
+
+      var playerScore = 0;
+      var roundNumber = 1;
+      var maxRounds = 1;
+      var gameActive = true;
+
+      var isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+
+      /* Removed left/right button logic: use only AIM and FIRE plus drag for horizontal move */
+
+      function initMobileControls() {
+        var controlsDiv = document.createElement("div");
+        controlsDiv.id = "touchControls";
+        controlsDiv.innerHTML = `
+                <button id="aimButton" class="control-button">AIM</button>
+                <button id="fireButton" class="control-button">HIT</button>
+            `;
+        document.body.appendChild(controlsDiv);
+
+        var aimBtn = document.getElementById("aimButton");
+        var fireBtn = document.getElementById("fireButton");
+
+        aimBtn.addEventListener(
+          "touchstart",
+          function (e) {
+            e.preventDefault();
+            startVerticalCursorMovement();
+            aimBtn.style.transform = "scale(0.95)";
+          },
+          { passive: false }
+        );
+        aimBtn.addEventListener(
+          "touchend",
+          function (e) {
+            e.preventDefault();
+            aimBtn.style.transform = "scale(1)";
+          },
+          { passive: false }
+        );
+        aimBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          startVerticalCursorMovement();
+        });
+
+        fireBtn.addEventListener(
+          "touchstart",
+          function (e) {
+            e.preventDefault();
+            stopVerticalCursorMovement();
+            fireBtn.style.transform = "scale(0.95)";
+          },
+          { passive: false }
+        );
+        fireBtn.addEventListener(
+          "touchend",
+          function (e) {
+            e.preventDefault();
+            fireBtn.style.transform = "scale(1)";
+          },
+          { passive: false }
+        );
+        fireBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          stopVerticalCursorMovement();
+        });
+
+        // Prevent page gestures during gameplay
+        document.addEventListener(
+          "touchmove",
+          function (e) {
+            e.preventDefault();
+          },
+          { passive: false }
+        );
+      }
+
+      function initGameUI() {
+        var uiDiv = document.createElement("div");
+        uiDiv.id = "gameUI";
+        uiDiv.innerHTML = `
+                <h3>DART BOARD GAME</h3>
+                <div>SCORE <span id="scoreDisplay">${playerScore}</span></div>
+                <div>DARTS <span id="dartsDisplay">${dartCount}</span></div>
+            `;
+        document.body.appendChild(uiDiv);
+      }
+
+      function updateGameUI() {
+        document.getElementById("scoreDisplay").textContent = playerScore;
+        document.getElementById("dartsDisplay").textContent = dartCount;
+      }
+
+      function checkGameEnd() {
+        if (roundNumber > maxRounds) {
+          setTimeout(() => {
+            gameActive = false;
+            showGameOver();
+          }, 800); // adjust 800ms based on your dart flight time
+        }
+      }
+
+      // Add this helper function somewhere in your script
+      function showMessage(text) {
+        var msg = document.getElementById("hitMessage");
+        msg.textContent = text;
+        msg.style.opacity = 1;
+        clearTimeout(msg._timeoutId);
+        msg._timeoutId = setTimeout(() => {
+          msg.style.opacity = 0;
+        }, 1500);
+      }
+
+      //  <p>ROUNDS COMPLETED: ${roundNumber - 1}</p>
+      function showGameOver() {
+        var gameOverScreen = document.createElement("div");
+        gameOverScreen.id = "gameOverScreen";
+        gameOverScreen.style.display = "flex";
+        gameOverScreen.innerHTML = `
+                <h1>GAME COMPLETE</h1>
+                <p>FINAL SCORE: ${playerScore}</p>
+               
+                <button id="restartButton">PLAY AGAIN</button>
+            `;
+        document.body.appendChild(gameOverScreen);
+
+        document
+          .getElementById("restartButton")
+          .addEventListener("click", restartGame);
+      }
+
+      function restartGame() {
+        playerScore = 0;
+        roundNumber = 1;
+        dartCount = 3;
+        gameActive = true;
+
+        document.getElementById("gameOverScreen").remove();
+        // updateGameUI();
+
+        // 🔹 Remove all old landed darts (if you appended them)
+        const oldDarts = document.querySelectorAll(".landed-dart");
+        oldDarts.forEach((d) => d.remove());
+
+        // 🔹 Reset dart visibility if you reuse a single dart element
+        const dart = document.getElementById("dart");
+        dart.style.visibility = "hidden";
+
+        // Update UI again
+        updateGameUI();
+
+        generateAngle();
+        initCursor();
+      }
+
+      function nextRound() {
+        roundNumber++;
+        dartCount = 3;
+        // updateGameUI();
+        checkGameEnd();
+        if (gameActive) {
+          generateAngle();
+        }
+      }
+
+      function initWindIndicator(newAngle) {
+        var wi = document.getElementById("windIndicator");
+        wi.innerHTML = "";
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var shadow = document.createElement("div");
+          shadow.id = "shadow" + i;
+          shadow.className = "windCell";
+          wi.appendChild(shadow);
+        }
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var cell = document.createElement("div");
+          cell.id = "cell" + i;
+          cell.className = "windCell";
+          wi.appendChild(cell);
+        }
+        setWindAngle(newAngle);
+        startWindAnimation();
+      }
+
+      function setWindAngle(newAngle) {
+        wind_angle = newAngle;
+        var rad = newAngle * (Math.PI / 180);
+        var rad2 = rad - Math.PI;
+        var radius = 23;
+        var cx = 29;
+        var cy = 29;
+        var sx = Math.cos(rad2) * radius + cx;
+        var sy = Math.sin(rad2) * radius + cy;
+        var step = (radius * 2) / WIND_CELL_COUNT;
+        var stp = 0;
+
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var px = sx + Math.cos(rad) * stp;
+          var py = sy + Math.sin(rad) * stp;
+
+          var sh = document.getElementById("shadow" + i);
+          sh.style.top = Math.round(py) - 4 + "px";
+          sh.style.left = Math.round(px) - 4 + "px";
+
+          var cl = document.getElementById("cell" + i);
+          cl.style.top = Math.round(py) - 4 + "px";
+          cl.style.left = Math.round(px) - 4 + "px";
+
+          if (WIND_CELL_COUNT - i > windStrenght) {
+            cl.style.backgroundPosition = "-9px 0px";
+          } else {
+            cl.style.backgroundPosition = "-36px 0px";
+          }
+          stp += step;
+        }
+      }
+
+      function startWindAnimation() {
+        setInterval("doWindAnimation()", WIND_TIMER);
+      }
+
+      function doWindAnimation() {
+        wind_phase++;
+        if (wind_phase > 4) wind_phase = 0;
+
+        for (let i = 0; i < windStrenght; i++) {
+          var state = (wind_phase + i) % 4;
+          var offset = -(9 + state * 9);
+          var cl = document.getElementById(
+            "cell" + (WIND_CELL_COUNT - windStrenght + i)
+          );
+          cl.style.backgroundPosition = offset + "px 0px";
+        }
+      }
+
+      function generateAngle() {
+        gameAngle = Math.round(360 * Math.random());
+        windStrenght = Math.round(15 * Math.random()) + 5;
+        setWindAngle(gameAngle);
+      }
+
+      function getWindXOffset() {
+        var a = gameAngle * (Math.PI / 180) - Math.PI;
+        var xo = Math.cos(a) * windStrenght;
+        return Math.round(xo);
+      }
+
+      function getWindYOffset() {
+        var a = gameAngle * (Math.PI / 180) - Math.PI;
+        var yo = Math.sin(a) * windStrenght;
+        return Math.round(yo);
+      }
+
+      function initPowerBar(xpos, ypos) {
+        var el = document.getElementById("power-back");
+        el.style.visibility = "visible";
+
+        var el2 = document.getElementById("power");
+        el2.style.visibility = "visible";
+        setPowerBarProgress(0);
+      }
+
+      function setPowerBarProgress(val) {
+        var el = document.getElementById("power");
+        el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+        el.style.top = 140 - val + "px";
+        el.style.height = 150 - (139 - val) + "px";
+      }
+
+      function hidePowerBar() {
+        var el = document.getElementById("power-back");
+        el.style.visibility = "hidden";
+        var el2 = document.getElementById("power");
+        el2.style.visibility = "hidden";
+      }
+
+      function initCursor() {
+        // Horizontal range is within gameBox width minus hand width
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var hand = document.getElementById("handCursor");
+
+        // center horizontally
+        var centerX = (gb.width - hand.offsetWidth) / 2;
+        hand_left = centerX;
+        // place near bottom inside gameBox (we use bottom:10px via CSS)
+        moveCursor(hand_left, null);
+      }
+
+      function moveCursor(newX, newY) {
+        var dart = document.getElementById("handCursor");
+        if (typeof newX === "number") {
+          dart.style.left = Math.round(newX) + "px";
+        }
+        if (typeof newY === "number") {
+          dart.style.top = Math.round(newY) + "px";
+        }
+      }
+
+      function doVerticalCursorMovement() {
+        // Map old logical vertical oscillation to visual bottom-offset hand
+        // We'll animate via top based on gameBox coordinate system.
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var hand = document.getElementById("handCursor");
+
+        // Compute absolute top from bottom:10 baseline
+        // Convert current computed top
+        let currentTop = parseFloat(window.getComputedStyle(hand).top);
+        if (isNaN(currentTop)) {
+          // If using bottom positioning, switch to top baseline
+          hand.style.bottom = "";
+          currentTop = gb.height - hand.offsetHeight - 10;
+          hand.style.top = currentTop + "px";
+        }
+
+        // Oscillate between CURSOR_TOP and CURSOR_BOTTOM mapped into this layout
+        // Define a visible band near the bottom (about 30px span like before)
+        var bandHeight = 30;
+        var bottomBaseTop = gb.height - hand.offsetHeight - 10; // top that corresponds to CSS bottom:10px
+        var topLimit = bottomBaseTop - bandHeight; // higher (smaller top)
+        var bottomLimit = bottomBaseTop; // lower (bigger top)
+
+        // Keep internal hand_top aligned to this top coordinate space
+        if (typeof doVerticalCursorMovement.handTop === "undefined") {
+          doVerticalCursorMovement.handTop = bottomLimit;
+        }
+
+        doVerticalCursorMovement.handTop += cursor_ver;
+
+        if (cursor_ver > 0 && doVerticalCursorMovement.handTop > bottomLimit) {
+          doVerticalCursorMovement.handTop = bottomLimit;
+          cursor_ver *= -1;
+        }
+        if (cursor_ver < 0 && doVerticalCursorMovement.handTop < topLimit) {
+          doVerticalCursorMovement.handTop = topLimit;
+          cursor_ver *= -1;
+        }
+
+        // Progress maps the band to 0..130 like before
+        if (SHOW_PROGRESS_BAR == 1) {
+          var prog =
+            ((doVerticalCursorMovement.handTop - topLimit) * 130) /
+            (bottomLimit - topLimit);
+          setPowerBarProgress(prog);
+        }
+
+        moveCursor(null, doVerticalCursorMovement.handTop);
+      }
+
+      function startVerticalCursorMovement() {
+        if (firing == 0 && gameActive) {
+          aimingMode = true;
+          cursorTimerId = setInterval(doVerticalCursorMovement, CURSOR_TIMER);
+          firing = 1;
+
+          if (SHOW_PROGRESS_BAR == 1) {
+            initPowerBar();
+          }
+
+          var aimBtn = document.getElementById("aimButton");
+          if (aimBtn) {
+            aimBtn.classList.add("aiming");
+            aimBtn.textContent = "AIMING...";
+          }
+        }
+      }
+
+      function stopVerticalCursorMovement() {
+        if (!gameActive) return;
+
+        firing = 0;
+        aimingMode = false;
+        clearInterval(cursorTimerId);
+
+        // Compute fire target based on current hand position
+        var hand = document.getElementById("handCursor");
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var handRect = hand.getBoundingClientRect();
+
+        // Convert hand visual position to game coordinates
+        var localX = handRect.left - gb.left;
+        var localY = handRect.top - gb.top;
+
+        // Use prior mapping logic for fireY based on band
+        // Estimate logical hand_top relative to our band and map like before
+        var bottomBaseTop = gb.height - hand.offsetHeight - 10;
+        var bandHeight = 30;
+        var topLimit = bottomBaseTop - bandHeight;
+        var bottomLimit = bottomBaseTop;
+
+        var bandPos = Math.max(topLimit, Math.min(bottomLimit, localY));
+        var bandRatio = (bandPos - topLimit) / (bottomLimit - topLimit); // 0..1
+        // Reuse original scale for Y targeting
+        var fireY =
+          360 - bandRatio * 30 * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+        var fireX = localX - DART_REF_X + HAND_REF_X;
+
+        if (WIND_ACTIVE == 1) {
+          fireDart(fireX + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+        } else {
+          fireDart(fireX, fireY);
+        }
+
+        var el = document.getElementById("handCursor");
+        el.style.backgroundPosition = "-100px 0px";
+
+        if (SHOW_PROGRESS_BAR == 1) {
+          hidePowerBar();
+        }
+
+        var aimBtn = document.getElementById("aimButton");
+        if (aimBtn) {
+          aimBtn.classList.remove("aiming");
+          aimBtn.textContent = "AIM";
+        }
+      }
+
+      // function fireDart(tarX, tarY) {
+      //     var dart = document.getElementById("dart");
+      //     dart.style.left = tarX + "px";
+      //     dart.style.top = tarY + "px";
+      //     dart.style.visibility = "visible";
+
+      //     computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+      //     generateScore();
+
+      //     playerScore += totalScore;
+
+      //     addScoreA(totalScore);
+
+      //     dartCount--;
+      //     if (dartCount == 0) {
+      //         nextRound();
+      //     }
+      //     // updateGameUI();
+      //     renderIndicator();
+      //     doFlightAnim(0);
+      // }
+
+      
+      function fireDart(tarX, tarY) {
+        var dart = document.getElementById("dart");
+        dart.style.left = tarX + "px";
+        dart.style.top = tarY + "px";
+        dart.style.visibility = "visible";
+
+        computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+        generateScore();
+
+        playerScore += totalScore;
+
+        addScoreA(totalScore);
+
+        dartCount--;
+        if (dartCount == 0) {
+          nextRound();
+        }
+        renderIndicator();
+        doFlightAnim(0);
+
+        // Show hit or miss message based on whether within board radius
+        var dx = tarX + DART_REF_X - BOARD_CENTER_X;
+        var dy = tarY + DART_REF_Y - BOARD_CENTER_Y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= BOARD_RADIUS) {
+          showMessage("Wow! Awesome!");
+        } else {
+          showMessage("Missed it!");
+        }
+      }
+
+      function generateScore() {
+        if (segmentType >= SEGMENT_NAMES.length) {
+          totalScore = 0;
+          return;
+        }
+        if (segment >= SCORE_VALUES.length) {
+          totalScore = 0;
+          return;
+        }
+
+        if (SEGMENT_NAMES[segmentType] == "out") {
+          totalScore = 0;
+        } else if (SEGMENT_NAMES[segmentType] == "50") {
+          totalScore = 50;
+        } else {
+          if (SEGMENT_NAMES[segmentType] == "25") {
+            totalScore = 25;
+          } else {
+            totalScore = SCORE_VALUES[segment];
+            if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+            if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+          }
+        }
+      }
+
+      function computeHit(xpos, ypos) {
+        var dx = BOARD_CENTER_X - xpos;
+        var dy = BOARD_CENTER_Y - ypos;
+        var angle = Math.atan2(dy, dx);
+        var delta = Math.sqrt(dx * dx + dy * dy);
+
+        var sg = 0;
+        for (let i = 0; i < 6; i++) {
+          if (delta > SEGMENTS[i]) sg = i + 1;
+        }
+
+        segmentType = sg;
+        segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+        segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+        if (segment < 0) segment = 0;
+        if (segment >= SCORE_VALUES.length) segment = SCORE_VALUES.length - 1;
+      }
+
+      function addScoreA(msg) {
+        // scoreA is hidden; no-op visual
+      }
+
+      function showcell(x, y, id) {
+        var el = document.getElementById(id);
+        var cx = -(x * sprite_cellwidth);
+        var cy = -(y * sprite_cellheight);
+        el.style.backgroundPosition = cx + "px " + cy + "px";
+      }
+
+      function doFlightAnim(step) {
+        clearTimeout(animId);
+        if (step <= 20) {
+          showcell(step, 0, "dart");
+          animId = setTimeout(function () {
+            doFlightAnim(step + 1);
+          }, FLIGHT_ANIM_DELAY);
+        } else {
+          var el = document.getElementById("handCursor");
+          el.style.backgroundPosition = "0px 0px";
+        }
+      }
+
+      function renderIndicator() {
+        var width = dartCount * 35;
+        var drt = document.getElementById("darts");
+        drt.style.width = width + "px";
+      }
+
+      /* Drag: horizontal only within gameBox */
+      (function enableHandDrag() {
+        var hand = document.getElementById("handCursor");
+        var game = document.getElementById("gameBox");
+        var dragging = false;
+        var startX = 0;
+        var startLeft = 0;
+
+        function getBounds() {
+          var gb = game.getBoundingClientRect();
+          var hw = hand.offsetWidth;
+          return { min: 0, max: gb.width - hw };
+        }
+
+        function onPointerDown(e) {
+          dragging = true;
+          hand.classList.add("dragging");
+          hand.setPointerCapture?.(e.pointerId);
+          var gb = game.getBoundingClientRect();
+          var left = parseFloat(getComputedStyle(hand).left) || 0;
+          startLeft = left;
+          startX = e.clientX;
+        }
+
+        function onPointerMove(e) {
+          if (!dragging) return;
+          var deltaX = e.clientX - startX;
+          var bounds = getBounds();
+          var newLeft = Math.max(
+            bounds.min,
+            Math.min(bounds.max, startLeft + deltaX)
+          );
+          moveCursor(newLeft, null);
+        }
+
+        function onPointerUp(e) {
+          dragging = false;
+          hand.classList.remove("dragging");
+          hand.releasePointerCapture?.(e.pointerId);
+        }
+
+        // Pointer events cover mouse + touch
+        hand.addEventListener("pointerdown", onPointerDown);
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", onPointerUp);
+      })();
+
+      /* Keyboard support for AIM/FIRE only */
+      document.addEventListener("keydown", function (e) {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (!aimingMode) startVerticalCursorMovement();
+          else stopVerticalCursorMovement();
+        }
+      });
+
+      // Initialize
+      window.addEventListener("load", function () {
+        // initGameUI();
+        initMobileControls();
+        initCursor();
+        initPowerBar();
+        hidePowerBar();
+        initWindIndicator(45);
+        generateAngle();
+        renderIndicator();
+        // updateGameUI();
+      });
+
+      // Prevent zoom on double tap
+      var lastTouchEnd = 0;
+      document.addEventListener(
+        "touchend",
+        function (event) {
+          var now = new Date().getTime();
+          if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        },
+        false
+      );
+    </script>
+  </body>
+</html>
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Professional Darts Game</title>
+    <style>
+        :root {
+            --primary-color: #ffcc00;
+            --secondary-color: #e74c3c;
+            --accent-color: #3498db;
+            --dark-bg: #1a1a2e;
+            --darker-bg: #0f0f1a;
+            --light-text: #ffffff;
+            --dark-text: #333333;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --card-border: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--light-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #gameHeader {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+        }
+
+        .gameTitle {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        #gameStats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .statBox {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+        }
+
+        .statLabel {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .statValue {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        #gameArea {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gameBox {
+            position: relative;
+            width: 550px;
+            height: 400px;
+            background-image: url(media/beta-brd2.jpg);
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            white-space: nowrap;
+            overflow: visible;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+        }
+
+        #dart {
+            position: absolute;
+            visibility: hidden;
+            background-image: url(media/dart-flight.gif);
+            left: 300px;
+            width: 57px;
+            height: 400px;
+        }
+
+        #scoreA {
+            position: absolute;
+            left: 29px;
+            top: 135px;
+            width: 68px;
+            height: 155px;
+            text-align: center;
+            font-size: 15px;
+            color: rgb(255, 255, 255);
+            font-weight: bold;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            padding: 5px;
+        }
+
+        #power-back {
+            position: absolute;
+            visibility: hidden;
+            left: 510px;
+            top: 130px;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+            background-position: -36px 0px;
+        }
+
+        #power {
+            position: absolute;
+            visibility: hidden;
+            left: 0;
+            top: 0;
+            width: 36px;
+            height: 150px;
+            background-image: url(media/pbar.gif);
+        }
+
+        #darts {
+            position: absolute;
+            top: 288px;
+            left: 34px;
+            width: 115px;
+            height: 108px;
+            background-image: url(media/darts.png);
+        }
+
+        #handCursor {
+            position: absolute;
+            top: 350px;
+            left: 450px;
+            width: 100px;
+            height: 114px;
+            background-image: url(media/hand-csr.gif);
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7));
+        }
+
+        #windIndicator {
+            position: absolute;
+            top: 11px;
+            left: 481px;
+            width: 58px;
+            height: 58px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            padding: 5px;
+        }
+
+        .windCell {
+            position: absolute;
+            width: 9px;
+            height: 9px;
+            background-image: url(media/wind.gif);
+        }
+
+        #gameUI {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            min-width: 150px;
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--card-border);
+        }
+
+        #gameUI h2 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        #gameUI div {
+            margin: 5px 0;
+        }
+
+        #gameUI span {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        #controlsPanel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 90%;
+            max-width: 500px;
+            z-index: 1000;
+        }
+
+        #directionalControls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .controlButton {
+            width: 70px;
+            height: 70px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-color), #2980b9);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.1s ease;
+        }
+
+        .controlButton:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        #actionControls {
+            display: flex;
+            gap: 20px;
+        }
+
+        .actionButton {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .actionButton:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        #aimButton {
+            background: linear-gradient(135deg, var(--secondary-color), #c0392b);
+        }
+
+        #aimButton.active {
+            background: linear-gradient(135deg, var(--success-color), #2ecc71);
+            box-shadow: 0 0 15px rgba(39, 174, 96, 0.7);
+        }
+
+        #fireButton {
+            background: linear-gradient(135deg, var(--warning-color), #e67e22);
+        }
+
+        #fireButton:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .gameOverContent {
+            background: linear-gradient(135deg, var(--dark-bg), var(--darker-bg));
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--card-border);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        #gameOverScreen h1 {
+            font-size: 42px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        #gameOverScreen p {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        #finalScore {
+            font-size: 36px;
+            color: var(--primary-color);
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        #restartButton {
+            padding: 15px 40px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, var(--success-color), #2ecc71);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #restartButton:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        #restartButton:active {
+            transform: translateY(0);
+        }
+
+        #scorePopup {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1500;
+            transition: all 0.5s ease;
+        }
+
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            z-index: 3000;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+        }
+
+        #instructions h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        #instructions p {
+            margin: 10px 0;
+            line-height: 1.5;
+        }
+
+        #closeInstructions {
+            margin-top: 15px;
+            padding: 8px 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media screen and (max-width: 600px) {
+            #gameBox {
+                transform: scale(0.8);
+            }
+            
+            .controlButton {
+                width: 60px;
+                height: 60px;
+                font-size: 20px;
+            }
+            
+            .actionButton {
+                padding: 12px 20px;
+                font-size: 16px;
+                min-width: 100px;
+            }
+            
+            #gameHeader {
+                padding: 8px 15px;
+            }
+            
+            .gameTitle {
+                font-size: 20px;
+            }
+            
+            .statBox {
+                padding: 6px 12px;
+            }
+            
+            .statValue {
+                font-size: 16px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            #gameBox {
+                transform: scale(0.6);
+            }
+            
+            #controlsPanel {
+                bottom: 10px;
+            }
+            
+            .controlButton {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+            
+            .actionButton {
+                padding: 10px 15px;
+                font-size: 14px;
+                min-width: 90px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="gameHeader">
+            <div class="gameTitle">PRO DARTS</div>
+            <div id="gameStats">
+                <div class="statBox">
+                    <div class="statLabel">ROUND</div>
+                    <div class="statValue" id="roundDisplay">1/3</div>
+                </div>
+                <div class="statBox">
+                    <div class="statLabel">SCORE</div>
+                    <div class="statValue" id="scoreDisplay">0</div>
+                </div>
+                <div class="statBox">
+                    <div class="statLabel">DARTS</div>
+                    <div class="statValue" id="dartsDisplay">3</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="gameArea">
+            <div id="gameBox">
+                <div id="windIndicator"></div>
+                <div id="darts"></div>
+                <div id="power-back" style="visibility: hidden; top: 10px; left: 10px">
+                    <div id="power" style="visibility: hidden; background-position: 0px -139px; top: 140px; height: 11px;"></div>
+                </div>
+                <div id="handCursor" style="background-position: 0px 0px; left: 380px; top: 350px"></div>
+                <div id="scoreA"></div>
+                <div id="dart">&nbsp;</div>
+                <div id="scorePopup"></div>
+            </div>
+        </div>
+        
+        <div id="controlsPanel">
+            <div id="directionalControls">
+                <button class="controlButton" id="leftButton">←</button>
+                <div style="width: 100px; text-align: center; font-size: 12px; opacity: 0.8;">AIM</div>
+                <button class="controlButton" id="rightButton">→</button>
+            </div>
+            <div id="actionControls">
+                <button class="actionButton" id="aimButton">AIM</button>
+                <button class="actionButton" id="fireButton">FIRE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameOverScreen">
+        <div class="gameOverContent">
+            <h1>GAME OVER</h1>
+            <p>Your Final Score:</p>
+            <div id="finalScore">0</div>
+            <p>Rounds Completed: <span id="roundsCompleted">0</span></p>
+            <button id="restartButton">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <div id="instructions">
+        <h3>HOW TO PLAY</h3>
+        <p>Use LEFT and RIGHT buttons to aim horizontally</p>
+        <p>Press AIM to start vertical aiming, then FIRE to throw</p>
+        <p>Complete 3 rounds to finish the game</p>
+        <p>Try to score as high as possible!</p>
+        <button id="closeInstructions">GOT IT!</button>
+    </div>
+
+    <script>
+        // Game variables
+        var SHOW_PROGRESS_BAR = 1;
+        var WIND_ACTIVE = 1;
+
+        var GAME_XRES = 550;
+        var GAME_YRES = 400;
+
+        var HAND_REF_X = 12;
+
+        var BOARD_CENTER_X = 363;
+        var BOARD_CENTER_Y = 201;
+        var BOARD_RADIUS = 154;
+
+        var OFFSET_POINT_X = 515;
+        var OFFSET_POINT_Y = 176;
+
+        var SEGMENT_COUNT = 20;
+        var SEGMENT_SIZE = Math.PI / 10.0;
+
+        var SEGMENTS = [10, 21, 77, 90, 141, 154];
+        var SEGMENT_NAMES = ["50", "25", "value", "tripple", "value", "double", "out"];
+
+        var angleOffset = Math.round(-Math.atan2(BOARD_CENTER_Y - OFFSET_POINT_Y, BOARD_CENTER_X - OFFSET_POINT_X) * (180.0 / Math.PI) + 180.0);
+
+        var SCORE_VALUES = [6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10, 6];
+
+        var targetAngle = 0;
+        var targetDelta = 0;
+        var targetDX = 0;
+        var targetDY = 0;
+
+        var segmentIndex = 0;
+        var segmentType = 0;
+        var segmentAngle = 0;
+        var segment = 0;
+        var totalScore = 0;
+
+        var DART_REF_X = 34;
+        var DART_REF_Y = 66;
+
+        var FLIGHT_ANIM_DELAY = 20;
+
+        var dartCount = 3;
+        var ligthOn = 0;
+
+        var CURSOR_LEFT = 10;
+        var CURSOR_RIGHT = 530;
+        var CURSOR_TOP = 350;
+        var CURSOR_BOTTOM = 380;
+
+        var CURSOR_HOR_STEP = 15;
+        var CURSOR_VER_STEP = 1;
+
+        var cursor_ver = CURSOR_VER_STEP;
+        var CURSOR_TIMER = 50;
+
+        var hand_top = 350;
+        var hand_left = 450;
+
+        var cursorTimerId = 0;
+        var dartTimerId = 1;
+
+        var firing = 0;
+        var aimingMode = false;
+        var horizontalMovementActive = false;
+
+        var wind_angle = 0;
+        var wind_phase = 0;
+
+        var WIND_CELL_COUNT = 20;
+        var WIND_TIMER = 300;
+
+        var wind_cell_x = [WIND_CELL_COUNT];
+        var wind_cell_y = [WIND_CELL_COUNT];
+
+        var gameAngle = 0;
+        var windStrenght = 0;
+
+        var sprite_cellwidth = 57;
+        var sprite_cellheight = 400;
+        var sprite_cellnum = 21;
+        var animId;
+
+        // Single player game variables
+        var playerScore = 0;
+        var roundNumber = 1;
+        var maxRounds = 3;
+        var gameActive = true;
+
+        // Mobile detection
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // Initialize the game
+       function initGame() {
+    initMobileControls();
+    initCursor();
+    initPowerBar(10, 10);
+    hidePowerBar();
+    initWindIndicator(45);
+    generateAngle();
+    updateGameUI();
+    
+    // Show instructions on first load - make sure we're using the right display property
+    setTimeout(function() {
+        var instructions = document.getElementById("instructions");
+        if (instructions) {
+            instructions.style.display = "block"; // Changed from 'flex' to 'block'
+            console.log("Instructions shown");
+        }
+    }, 500);
+}
+
+        // Manual movement functions
+        function moveLeft() {
+            if (!aimingMode && !firing && gameActive) {
+                hand_left -= CURSOR_HOR_STEP;
+                if (hand_left < CURSOR_LEFT) {
+                    hand_left = CURSOR_LEFT;
+                }
+                moveCursor(hand_left, hand_top);
+            }
+        }
+
+        function moveRight() {
+            if (!aimingMode && !firing && gameActive) {
+                hand_left += CURSOR_HOR_STEP;
+                if (hand_left > CURSOR_RIGHT) {
+                    hand_left = CURSOR_RIGHT;
+                }
+                moveCursor(hand_left, hand_top);
+            }
+        }
+
+      function initMobileControls() {
+    var leftBtn = document.getElementById("leftButton");
+    var rightBtn = document.getElementById("rightButton");
+    var aimBtn = document.getElementById("aimButton");
+    var fireBtn = document.getElementById("fireButton");
+
+    // Left button events
+    leftBtn.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        moveLeft();
+    });
+    leftBtn.addEventListener("touchend", function(e) {
+        e.preventDefault();
+    });
+    leftBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        moveLeft();
+    });
+
+    // Right button events
+    rightBtn.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        moveRight();
+    });
+    rightBtn.addEventListener("touchend", function(e) {
+        e.preventDefault();
+    });
+    rightBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        moveRight();
+    });
+
+    // Aim button events
+    aimBtn.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        startVerticalCursorMovement();
+    });
+    aimBtn.addEventListener("touchend", function(e) {
+        e.preventDefault();
+    });
+    aimBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        startVerticalCursorMovement();
+    });
+
+    // Fire button events
+    fireBtn.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        stopVerticalCursorMovement();
+    });
+    fireBtn.addEventListener("touchend", function(e) {
+        e.preventDefault();
+    });
+    fireBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        stopVerticalCursorMovement();
+    });
+
+    // Close instructions - with safety check and better event handling
+    var closeInstructionsBtn = document.getElementById("closeInstructions");
+    if (closeInstructionsBtn) {
+        console.log("Close instructions button found, adding event listener");
+        
+        closeInstructionsBtn.addEventListener("click", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Close instructions button clicked");
+            var instructions = document.getElementById("instructions");
+            if (instructions) {
+                instructions.style.display = "none";
+                console.log("Instructions hidden");
+            }
+        });
+        
+        // Also add touch events for mobile
+        closeInstructionsBtn.addEventListener("touchstart", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Close instructions touch start");
+            document.getElementById("instructions").style.display = "none";
+        });
+    } else {
+        console.log("Close instructions button NOT found");
+    }
+
+    // Prevent default touch behaviors
+    document.addEventListener("touchmove", function(e) {
+        e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener("touchstart", function(e) {
+        if (e.target.tagName !== "BUTTON") {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Add keyboard support for desktop testing
+    document.addEventListener("keydown", function(e) {
+        switch(e.key) {
+            case "ArrowLeft":
+            case "a":
+            case "A":
+                e.preventDefault();
+                moveLeft();
+                break;
+            case "ArrowRight":
+            case "d":
+            case "D":
+                e.preventDefault();
+                moveRight();
+                break;
+            case " ":
+            case "Enter":
+                e.preventDefault();
+                if (!aimingMode) {
+                    startVerticalCursorMovement();
+                } else {
+                    stopVerticalCursorMovement();
+                }
+                break;
+        }
+    });
+}
+        function updateGameUI() {
+            document.getElementById("roundDisplay").textContent = `${roundNumber}/${maxRounds}`;
+            document.getElementById("scoreDisplay").textContent = playerScore;
+            document.getElementById("dartsDisplay").textContent = dartCount;
+        }
+
+        function checkGameEnd() {
+            if (roundNumber > maxRounds) {
+                gameActive = false;
+                showGameOver();
+            }
+        }
+
+        function showGameOver() {
+            document.getElementById("finalScore").textContent = playerScore;
+            document.getElementById("roundsCompleted").textContent = roundNumber - 1;
+            document.getElementById("gameOverScreen").style.display = "flex";
+        }
+
+        function restartGame() {
+            playerScore = 0;
+            roundNumber = 1;
+            dartCount = 3;
+            gameActive = true;
+            
+            document.getElementById("gameOverScreen").style.display = "none";
+            updateGameUI();
+            
+            // Reset wind
+            generateAngle();
+            
+            // Reset cursor position
+            initCursor();
+            
+            // Clear score display
+            document.getElementById("scoreA").innerHTML = "";
+        }
+
+        function nextRound() {
+            roundNumber++;
+            dartCount = 3;
+            updateGameUI();
+            checkGameEnd();
+            
+            // Generate new wind for the next round
+            if (gameActive) {
+                generateAngle();
+            }
+        }
+
+        function showScorePopup(score, x, y) {
+            var popup = document.getElementById("scorePopup");
+            popup.textContent = "+" + score;
+            popup.style.left = x + "px";
+            popup.style.top = y + "px";
+            popup.style.opacity = "1";
+            
+            setTimeout(function() {
+                popup.style.opacity = "0";
+                popup.style.top = (parseInt(popup.style.top) - 50) + "px";
+            }, 500);
+        }
+
+        // Wind functions
+        function initWindIndicator(newAngle) {
+            var wi = document.getElementById("windIndicator");
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newShadow = document.createElement("div");
+                var divIdName = "shadow" + i;
+                newShadow.setAttribute("id", divIdName);
+                newShadow.setAttribute("class", "windCell");
+                wi.appendChild(newShadow);
+            }
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var newCell = document.createElement("div");
+                var divIdName = "cell" + i;
+                newCell.setAttribute("id", divIdName);
+                newCell.setAttribute("class", "windCell");
+                wi.appendChild(newCell);
+            }
+
+            setWindAngle(newAngle);
+            startWindAnimation();
+        }
+
+        function setWindAngle(newAngle) {
+            wind_angle = newAngle;
+            var rad = newAngle * (Math.PI / 180);
+            var rad2 = rad - Math.PI;
+            var radius = 23;
+            var cx = 29;
+            var cy = 29;
+            var sx = Math.cos(rad2) * radius + cx;
+            var sy = Math.sin(rad2) * radius + cy;
+            var step = (radius * 2) / WIND_CELL_COUNT;
+            var stp = 0;
+
+            for (i = 0; i < WIND_CELL_COUNT; i++) {
+                var px = sx + Math.cos(rad) * stp;
+                var py = sy + Math.sin(rad) * stp;
+
+                var sh = document.getElementById("shadow" + i);
+                sh.style.top = Math.round(py) - 4 + "px";
+                sh.style.left = Math.round(px) - 4 + "px";
+
+                var cl = document.getElementById("cell" + i);
+                cl.style.top = Math.round(py) - 4 + "px";
+                cl.style.left = Math.round(px) - 4 + "px";
+
+                if (WIND_CELL_COUNT - i > windStrenght) {
+                    cl.style.backgroundPosition = "-9px 0px";
+                } else {
+                    cl.style.backgroundPosition = "-36px 0px";
+                }
+                stp += step;
+            }
+        }
+
+        function startWindAnimation() {
+            setInterval("doWindAnimation()", WIND_TIMER);
+        }
+
+        function doWindAnimation() {
+            wind_phase++;
+            if (wind_phase > 4) wind_phase = 0;
+
+            for (i = 0; i < windStrenght; i++) {
+                var state = (wind_phase + i) % 4;
+                var offset = -(9 + state * 9);
+
+                var cl = document.getElementById("cell" + (WIND_CELL_COUNT - windStrenght + i));
+                cl.style.backgroundPosition = offset + "px 0px";
+            }
+        }
+
+        function generateAngle() {
+            gameAngle = Math.round(360 * Math.random());
+            windStrenght = Math.round(15 * Math.random()) + 5;
+            setWindAngle(gameAngle);
+        }
+
+        function getWindXOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var xo = Math.cos(a) * windStrenght;
+            return Math.round(xo);
+        }
+
+        function getWindYOffset() {
+            var a = gameAngle * (Math.PI / 180) - Math.PI;
+            var yo = Math.sin(a) * windStrenght;
+            return Math.round(yo);
+        }
+
+        function initPowerBar(xpos, ypos) {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "visible";
+            el.style.top = ypos + "px";
+            el.style.left = xpos + "px";
+
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "visible";
+            setPowerBarProgress(0);
+        }
+
+        function setPowerBarProgress(val) {
+            var el = document.getElementById("power");
+            el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+            el.style.top = 140 - val + "px";
+            el.style.height = 150 - (139 - val) + "px";
+        }
+
+        function hidePowerBar() {
+            var el = document.getElementById("power-back");
+            el.style.visibility = "hidden";
+            var el2 = document.getElementById("power");
+            el2.style.visibility = "hidden";
+        }
+
+        function initCursor() {
+            hand_left = (CURSOR_LEFT + CURSOR_RIGHT) / 2;
+            hand_top = CURSOR_TOP;
+            moveCursor(hand_left, hand_top);
+        }
+
+        function moveCursor(newX, newY) {
+            hand_left = newX;
+            hand_top = newY;
+            var dart = document.getElementById("handCursor");
+            dart.style.left = hand_left + "px";
+            dart.style.top = hand_top + "px";
+        }
+
+        function doVerticalCursorMovement() {
+            hand_top += cursor_ver;
+
+            if (cursor_ver > 0 && hand_top > CURSOR_BOTTOM) {
+                hand_top = CURSOR_BOTTOM;
+                cursor_ver *= -1;
+            }
+
+            if (cursor_ver < 0 && hand_top < CURSOR_TOP) {
+                hand_top = CURSOR_TOP;
+                cursor_ver *= -1;
+            }
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                var prog = (hand_top - CURSOR_TOP) * (130 / (CURSOR_BOTTOM - CURSOR_TOP));
+                setPowerBarProgress(prog);
+            }
+
+            moveCursor(hand_left, hand_top);
+        }
+
+        function startVerticalCursorMovement() {
+            if (firing == 0 && gameActive) {
+                aimingMode = true;
+                cursorTimerId = setInterval("doVerticalCursorMovement()", CURSOR_TIMER);
+                firing = 1;
+
+                if (SHOW_PROGRESS_BAR == 1) {
+                    initPowerBar(510, 130);
+                }
+
+                // Update button state
+                var aimBtn = document.getElementById("aimButton");
+                if (aimBtn) {
+                    aimBtn.classList.add("active");
+                }
+            }
+        }
+
+        function stopVerticalCursorMovement() {
+            if (!gameActive) return;
+            
+            firing = 0;
+            aimingMode = false;
+            clearInterval(cursorTimerId);
+
+            var fireY = 360 - (hand_top - CURSOR_TOP) * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+            if (WIND_ACTIVE == 1) {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+            } else {
+                fireDart(hand_left - DART_REF_X + HAND_REF_X, fireY);
+            }
+
+            var el = document.getElementById("handCursor");
+            el.style.backgroundPosition = "-100px 0px";
+
+            if (SHOW_PROGRESS_BAR == 1) {
+                hidePowerBar();
+            }
+
+            // Update button state
+            var aimBtn = document.getElementById("aimButton");
+            if (aimBtn) {
+                aimBtn.classList.remove("active");
+            }
+        }
+
+        function mouseHandler(evt) {
+            if (isMobile) return;
+
+            var node = evt.target ? evt.target : evt.srcElement ? evt.srcElement : null;
+            evt = evt ? evt : event ? event : null;
+
+            var xpo = evt.clientX;
+            var ypo = evt.clientY;
+
+            var rx = xpo - 350;
+            var ry = ypo - 150;
+
+            computeHit(rx, ry);
+            generateScore();
+            addScoreA(totalScore);
+        }
+
+        function fireDart(tarX, tarY) {
+            var dart = document.getElementById("dart");
+            dart.style.left = tarX + "px";
+            dart.style.top = tarY + "px";
+            dart.style.visibility = "visible";
+
+            computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+            generateScore();
+            
+            // Add to player score
+            playerScore += totalScore;
+            
+            addScoreA(totalScore);
+            
+            // Show score popup
+            showScorePopup(totalScore, tarX + DART_REF_X, tarY + DART_REF_Y);
+
+            dartCount--;
+            if (dartCount == 0) {
+                nextRound();
+            }
+            updateGameUI();
+            renderIndicator();
+            doFlightAnim(0);
+        }
+
+        function generateScore() {
+            if (SEGMENT_NAMES[segmentType] == "out") {
+                totalScore = 0;
+            } else if (SEGMENT_NAMES[segmentType] == "50") {
+                totalScore = 50;
+            } else {
+                if (SEGMENT_NAMES[segmentType] == "25") {
+                    totalScore = 25;
+                } else {
+                    totalScore = SCORE_VALUES[segment];
+                    if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+                    if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+                }
+            }
+        }
+
+        function computeHit(xpos, ypos) {
+            var dx = BOARD_CENTER_X - xpos;
+            var dy = BOARD_CENTER_Y - ypos;
+            var angle = Math.atan2(dy, dx);
+            var delta = Math.sqrt(dx * dx + dy * dy);
+
+            var sg = 0;
+            for (i = 0; i < 6; i++) {
+                if (delta > SEGMENTS[i]) sg = i + 1;
+            }
+
+            segmentType = sg;
+            segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+            segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+        }
+
+        function addScoreA(msg) {
+            var ni = document.getElementById("scoreA");
+            var newpar = document.createElement("i");
+            newpar.innerHTML = "" + msg + "<br>";
+            ni.appendChild(newpar);
+
+            var objDiv = document.getElementById("scoreA");
+            objDiv.scrollTop = objDiv.scrollHeight;
+        }
+
+        function showcell(x, y, id) {
+            var el = document.getElementById(id);
+            var cx = -(x * sprite_cellwidth);
+            var cy = -(y * sprite_cellheight);
+            el.style.backgroundPosition = cx + "px " + cy + "px";
+        }
+
+        function doFlightAnim(step) {
+            dartTimerId = clearTimeout(animId);
+            if (step <= 20) {
+                showcell(step, 0, "dart");
+                dartTimerId = setTimeout("doFlightAnim(" + (step + 1) + ");", FLIGHT_ANIM_DELAY);
+            } else {
+                // Reset hand cursor to closed position after animation completes
+                var el = document.getElementById("handCursor");
+                el.style.backgroundPosition = "0px 0px";
+            }
+        }
+
+        function renderIndicator() {
+            var width = dartCount * 35;
+            var drt = document.getElementById("darts");
+            drt.style.width = width + "px";
+        }
+
+        // Initialize everything
+        window.addEventListener("load", function() {
+            initGame();
+            
+            // Add restart button event listener
+            document.getElementById("restartButton").addEventListener("click", restartGame);
+        });
+
+        // Prevent zoom on double tap
+        var lastTouchEnd = 0;
+        document.addEventListener("touchend", function (event) {
+            var now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html> -->

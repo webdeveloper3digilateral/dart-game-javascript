@@ -1,0 +1,1207 @@
+//1610 morning
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <title>Darts Game</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+
+      :root {
+        /* Physical margins: use cm so it matches your spec */
+        --bottom-safe: 3cm;
+        --right-safe: 0.5cm;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        background: linear-gradient(
+          135deg,
+          #0f0f23 0%,
+          #1a1a2e 50%,
+          #16213e 100%
+        );
+        font-family: "Orbitron", monospace;
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+      }
+
+      /* Animated background particles */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(
+            2px 2px at 20px 30px,
+            rgba(255, 255, 255, 0.1),
+            transparent
+          ),
+          radial-gradient(
+            2px 2px at 40px 70px,
+            rgba(255, 255, 255, 0.05),
+            transparent
+          ),
+          radial-gradient(
+            1px 1px at 90px 40px,
+            rgba(255, 255, 255, 0.1),
+            transparent
+          ),
+          radial-gradient(
+            1px 1px at 130px 80px,
+            rgba(255, 255, 255, 0.05),
+            transparent
+          );
+        background-repeat: repeat;
+        background-size: 200px 200px;
+        animation: sparkle 20s linear infinite;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      @keyframes sparkle {
+        0% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        100% {
+          transform: translateY(-200px) rotate(360deg);
+        }
+      }
+
+      /* Fullscreen game area with reserved bottom/right margins */
+      #gameBox {
+        position: fixed;
+        /* top: 10px; */
+        left: 18px;
+        bottom: 100px;
+        /* Occupy full screen minus the safe areas */
+        width: calc(95vw - var(--right-safe));
+        height: calc(100vh - var(--bottom-safe));
+        background-image: url(media/beta-brd2.jpg);
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        white-space: nowrap;
+        overflow: visible;
+        border-radius: 15px;
+        /* box-shadow: 0 0 30px rgba(0, 255, 255, 0.3),
+          0 0 60px rgba(0, 255, 255, 0.1),
+          inset 0 0 20px rgba(255, 255, 255, 0.05); */
+        z-index: 10;
+      }
+
+      /* Dart flight sprite */
+      #dart {
+        position: absolute;
+        visibility: hidden;
+        background-image: url(media/dart-flight.gif);
+        left: 300px;
+        width: 57px;
+        height: 400px;
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+      }
+
+      /* Hide legacy score list */
+      #scoreA {
+        display: none;
+      }
+
+      /* Power bar pinned near the right-safe gutter */
+      #power-back {
+        position: absolute;
+        visibility: hidden;
+        right: 8px; /* stays inside the 0.5cm gutter visually */
+        top: 150px;
+        width: 36px;
+        height: 150px;
+        background-image: url(media/pbar.gif);
+        background-position: -36px 0px;
+        border-radius: 5px;
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+      }
+
+      #power {
+        position: absolute;
+        visibility: hidden;
+        left: 0;
+        top: 0;
+        width: 36px;
+        height: 150px;
+        background-image: url(media/pbar.gif);
+        border-radius: 5px;
+      }
+
+      /* Darts indicator stays above the 3cm bottom */
+      #darts {
+        position: absolute;
+        /* bottom: 0px; */
+        top: 600px;
+        left: 10px;
+        width: 115px;
+        height: 108px;
+        background-image: url(media/darts.png);
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+      }
+
+      /* Hand cursor starts near bottom area but inside gameBox */
+      #handCursor {
+        position: absolute;
+        bottom: 80px; /* align relative to gameBox bottom */
+        left: 450px;
+        width: 100px;
+        height: 114px;
+        background-image: url(media/hand-csr.gif);
+        filter: drop-shadow(0 0 15px rgba(255, 255, 0, 0.6));
+        transition: filter 0.2s ease;
+        touch-action: none; /* for smooth dragging */
+        cursor: grab;
+      }
+      #handCursor.dragging {
+        cursor: grabbing;
+      }
+
+      /* Wind indicator column on the right edge inside the 0.5cm gutter */
+      #windIndicator {
+        /* position: absolute;
+            top: 11px;
+            right: 8px;
+            width: 58px;
+            height: 58px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 255, 0.5); */
+        display: none;
+      }
+      .windCell {
+        /* position: absolute;
+            width: 9px;
+            height: 9px;
+            background-image: url(media/wind.gif);
+            border-radius: 50%; */
+        display: none;
+      }
+
+      /* Game UI (score) */
+      #gameUI {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 100;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 20, 40, 0.95),
+          rgba(0, 40, 80, 0.95)
+        );
+        color: #00ffff;
+        padding: 20px;
+        border-radius: 15px;
+        font-size: 16px;
+        min-width: 180px;
+        border: 2px solid rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+          inset 0 0 20px rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+      }
+      #gameUI h3 {
+        margin: 0 0 15px 0;
+        font-size: 20px;
+        text-align: center;
+        color: #ffff00;
+        text-shadow: 0 0 15px rgba(255, 255, 0, 0.8);
+        font-weight: 700;
+        letter-spacing: 2px;
+      }
+      #gameUI div {
+        margin: 8px 0;
+        padding: 2px 0;
+        width: 300px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        display: flex;
+        justify-content: space-between;
+      }
+      #gameUI div:last-child {
+        border-bottom: none;
+      }
+      #gameUI span {
+        font-weight: bold;
+        color: #ffff00;
+        text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);
+      }
+
+      /* Add to your existing <style> */
+      #hitMessage {
+        position: absolute;
+        top: 30px; /* above dart board center */
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 50;
+        font-family: "Orbitron", monospace;
+        font-weight: 700;
+        font-size: 32px;
+        color: #00ffff;
+        text-shadow: 0 0 8px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      /* Touch controls: keep only AIM/FIRE centered above the bottom safe area */
+      #touchControls {
+        position: fixed;
+        left: 70%;
+        transform: translateX(-50%);
+        bottom: calc(
+          var(--bottom-safe) - 20px
+        ); /* slightly above the safe edge */
+        display: flex;
+        gap: 15px;
+        z-index: 1000;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 20, 40, 0.95),
+          rgba(0, 40, 80, 0.95)
+        );
+        padding: 10px 10px;
+        border-radius: 20px;
+        border: 2px solid rgba(0, 255, 255, 0.5);
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.3),
+          inset 0 0 20px rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(15px);
+      }
+      .control-button {
+        border: none;
+        border-radius: 12px;
+        font-weight: bold;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: all 0.2s ease;
+        user-select: none;
+        font-family: "Orbitron", monospace;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+      }
+      .control-button::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.5s ease;
+      }
+      .control-button:hover::before {
+        left: 100%;
+      }
+      .control-button:active {
+        transform: scale(0.95);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+      #aimButton {
+        width: 95px;
+        height: 55px;
+        background: linear-gradient(135deg, #f44336, #d32f2f);
+        color: white;
+        font-size: 14px;
+        border: 2px solid rgba(255, 0, 0, 0.5);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        letter-spacing: 1px;
+      }
+      #aimButton:hover {
+        background: linear-gradient(135deg, #ef5350, #e53935);
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+      }
+      #aimButton.aiming {
+        background: linear-gradient(135deg, #4caf50, #388e3c);
+        border-color: rgba(0, 255, 0, 0.5);
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+        50% {
+          box-shadow: 0 0 30px rgba(0, 255, 0, 0.9);
+        }
+      }
+      #fireButton {
+        width: 95px;
+        height: 55px;
+        background: linear-gradient(135deg, #ff9800, #f57c00);
+        color: white;
+        font-size: 14px;
+        border: 2px solid rgba(255, 165, 0, 0.5);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        letter-spacing: 1px;
+      }
+      #fireButton:hover {
+        background: linear-gradient(135deg, #ffb74d, #fb8c00);
+        box-shadow: 0 0 20px rgba(255, 165, 0, 0.6);
+      }
+
+      /* Game Over */
+      #gameOverScreen {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 0, 0, 0.9),
+          rgba(20, 20, 40, 0.95)
+        );
+        z-index: 2000;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: #00ffff;
+        text-align: center;
+        backdrop-filter: blur(10px);
+      }
+      #gameOverScreen h1 {
+        font-size: 48px;
+        color: #ffff00;
+        margin-bottom: 30px;
+        text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+        font-weight: 700;
+        letter-spacing: 3px;
+        animation: glow 2s ease-in-out infinite alternate;
+      }
+      @keyframes glow {
+        from {
+          text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+        }
+        to {
+          text-shadow: 0 0 50px rgba(255, 255, 0, 1);
+        }
+      }
+      #gameOverScreen p {
+        font-size: 24px;
+        margin: 15px 0;
+        text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+      }
+      #restartButton {
+        padding: 18px 35px;
+        margin-top: 30px;
+        background: linear-gradient(135deg, #4caf50, #388e3c);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        font-family: "Orbitron", monospace;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3),
+          0 0 20px rgba(76, 175, 80, 0.5);
+      }
+      #restartButton:hover {
+        background: linear-gradient(135deg, #66bb6a, #4caf50);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4),
+          0 0 30px rgba(76, 175, 80, 0.7);
+      }
+
+      /* Responsive tweaks */
+      @media screen and (max-width: 600px) {
+        #gameUI {
+          font-size: 14px;
+          padding: 15px;
+          min-width: 150px;
+        }
+        #touchControls {
+          padding: 14px;
+          gap: 12px;
+        }
+        .control-button {
+          font-size: 12px;
+        }
+        #aimButton,
+        #fireButton {
+          width: 85px;
+          height: 50px;
+        }
+      }
+      @media screen and (max-width: 480px) {
+        #gameUI {
+          top: 10px;
+          left: 10px;
+          font-size: 12px;
+        }
+        #gameOverScreen h1 {
+          font-size: 36px;
+        }
+        #gameOverScreen p {
+          font-size: 18px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="gameBox">
+      <div id="windIndicator"></div>
+      <!-- Add this inside #gameBox just above the dart element -->
+      <div id="hitMessage"></div>
+
+      <div id="darts"></div>
+
+      <!-- Power bar sits inside right gutter -->
+      <div id="power-back">
+        <div id="power" style="background-position: 0px -139px"></div>
+      </div>
+
+      <div id="handCursor" style="background-position: 0px 0px"></div>
+      <div id="scoreA"></div>
+      <div id="dart">&nbsp;</div>
+    </div>
+
+    <script>
+      var SHOW_PROGRESS_BAR = 1;
+      var WIND_ACTIVE = 1;
+
+      /* Game plane (old logical resolution kept for math, visuals now stretch to fullscreen) */
+      var GAME_XRES = 550;
+      var GAME_YRES = 400;
+
+      var HAND_REF_X = 12;
+
+      var BOARD_CENTER_X = 185;
+      var BOARD_CENTER_Y = 199;
+      var BOARD_RADIUS = 154;
+
+      var OFFSET_POINT_X = 333;
+      var OFFSET_POINT_Y = 176;
+
+      var SEGMENT_COUNT = 20;
+      var SEGMENT_SIZE = Math.PI / 10.0;
+
+      var SEGMENTS = [15, 30, 120, 135, 210, 225];
+      var SEGMENT_NAMES = [
+        "50",
+        "25",
+        "value",
+        "tripple",
+        "value",
+        "double",
+        "out",
+      ];
+
+      var angleOffset = Math.round(
+        -Math.atan2(
+          BOARD_CENTER_Y - OFFSET_POINT_Y,
+          BOARD_CENTER_X - OFFSET_POINT_X
+        ) *
+          (180.0 / Math.PI) +
+          180.0
+      );
+
+      var SCORE_VALUES = [
+        6, 13, 4, 18, 1, 20, 5, 12, 9, 14, 11, 8, 16, 7, 19, 3, 17, 2, 15, 10,
+        6,
+      ];
+
+      var targetAngle = 0;
+      var targetDelta = 0;
+      var targetDX = 0;
+      var targetDY = 0;
+
+      var segmentIndex = 0;
+      var segmentType = 0;
+      var segmentAngle = 0;
+      var segment = 0;
+      var totalScore = 0;
+
+      var DART_REF_X = 34;
+      var DART_REF_Y = 66;
+
+      var FLIGHT_ANIM_DELAY = 20;
+
+      var dartCount = 3;
+
+      var CURSOR_LEFT = 10;
+      var CURSOR_RIGHT = 300;
+      var CURSOR_TOP = 350;
+      var CURSOR_BOTTOM = 380;
+
+      var CURSOR_HOR_STEP = 15;
+      var CURSOR_VER_STEP = 1;
+
+      var cursor_ver = CURSOR_VER_STEP;
+      var CURSOR_TIMER = 50;
+
+      var hand_top = 350;
+      var hand_left = 450;
+
+      var cursorTimerId = 0;
+      var dartTimerId = 1;
+
+      var firing = 0;
+      var aimingMode = false;
+
+      var wind_angle = 0;
+      var wind_phase = 0;
+
+      var WIND_CELL_COUNT = 20;
+      var WIND_TIMER = 300;
+
+      var gameAngle = 0;
+      var windStrenght = 0;
+
+      var sprite_cellwidth = 57;
+      var sprite_cellheight = 400;
+      var sprite_cellnum = 21;
+      var animId;
+
+      var playerScore = 0;
+      var roundNumber = 1;
+      var maxRounds = 1;
+      var gameActive = true;
+
+      var isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+
+      /* Removed left/right button logic: use only AIM and FIRE plus drag for horizontal move */
+
+      function initMobileControls() {
+        var controlsDiv = document.createElement("div");
+        controlsDiv.id = "touchControls";
+        controlsDiv.innerHTML = `
+                <button id="aimButton" class="control-button">AIM</button>
+                <button id="fireButton" class="control-button">hitt</button>
+            `;
+        document.body.appendChild(controlsDiv);
+
+        var aimBtn = document.getElementById("aimButton");
+        var fireBtn = document.getElementById("fireButton");
+
+        aimBtn.addEventListener(
+          "touchstart",
+          function (e) {
+            e.preventDefault();
+            startVerticalCursorMovement();
+            aimBtn.style.transform = "scale(0.95)";
+          },
+          { passive: false }
+        );
+        aimBtn.addEventListener(
+          "touchend",
+          function (e) {
+            e.preventDefault();
+            aimBtn.style.transform = "scale(1)";
+          },
+          { passive: false }
+        );
+        aimBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          startVerticalCursorMovement();
+        });
+
+        fireBtn.addEventListener(
+          "touchstart",
+          function (e) {
+            e.preventDefault();
+            stopVerticalCursorMovement();
+            fireBtn.style.transform = "scale(0.95)";
+          },
+          { passive: false }
+        );
+        fireBtn.addEventListener(
+          "touchend",
+          function (e) {
+            e.preventDefault();
+            fireBtn.style.transform = "scale(1)";
+          },
+          { passive: false }
+        );
+        fireBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          stopVerticalCursorMovement();
+        });
+
+        // Prevent page gestures during gameplay
+        document.addEventListener(
+          "touchmove",
+          function (e) {
+            e.preventDefault();
+          },
+          { passive: false }
+        );
+      }
+
+      function initGameUI() {
+        var uiDiv = document.createElement("div");
+        uiDiv.id = "gameUI";
+        uiDiv.innerHTML = `
+                <h3>DART BOARD GAME</h3>
+                <div>SCORE <span id="scoreDisplay">${playerScore}</span></div>
+                <div>DARTS <span id="dartsDisplay">${dartCount}</span></div>
+            `;
+        document.body.appendChild(uiDiv);
+      }
+
+      function updateGameUI() {
+        document.getElementById("scoreDisplay").textContent = playerScore;
+        document.getElementById("dartsDisplay").textContent = dartCount;
+      }
+
+      function checkGameEnd() {
+        if (roundNumber > maxRounds) {
+          setTimeout(() => {
+            gameActive = false;
+            showGameOver();
+          }, 800); // adjust 800ms based on your dart flight time
+        }
+      }
+
+      // Add this helper function somewhere in your script
+      function showMessage(text) {
+        var msg = document.getElementById("hitMessage");
+        msg.textContent = text;
+        msg.style.opacity = 1;
+        clearTimeout(msg._timeoutId);
+        msg._timeoutId = setTimeout(() => {
+          msg.style.opacity = 0;
+        }, 1500);
+      }
+
+      //  <p>ROUNDS COMPLETED: ${roundNumber - 1}</p>
+      function showGameOver() {
+        var gameOverScreen = document.createElement("div");
+        gameOverScreen.id = "gameOverScreen";
+        gameOverScreen.style.display = "flex";
+        gameOverScreen.innerHTML = `
+                <h1>GAME COMPLETE</h1>
+                <p>FINAL SCORE: ${playerScore}</p>
+               
+                <button id="restartButton">PLAY AGAIN</button>
+            `;
+        document.body.appendChild(gameOverScreen);
+
+        document
+          .getElementById("restartButton")
+          .addEventListener("click", restartGame);
+      }
+
+      function restartGame() {
+        playerScore = 0;
+        roundNumber = 1;
+        dartCount = 3;
+        gameActive = true;
+
+        document.getElementById("gameOverScreen").remove();
+        // updateGameUI();
+
+        // 🔹 Remove all old landed darts (if you appended them)
+        const oldDarts = document.querySelectorAll(".landed-dart");
+        oldDarts.forEach((d) => d.remove());
+
+        // 🔹 Reset dart visibility if you reuse a single dart element
+        const dart = document.getElementById("dart");
+        dart.style.visibility = "hidden";
+
+        // Update UI again
+        updateGameUI();
+
+        generateAngle();
+        initCursor();
+      }
+
+      function nextRound() {
+        roundNumber++;
+        dartCount = 3;
+        // updateGameUI();
+        checkGameEnd();
+        if (gameActive) {
+          generateAngle();
+        }
+      }
+
+      function initWindIndicator(newAngle) {
+        var wi = document.getElementById("windIndicator");
+        wi.innerHTML = "";
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var shadow = document.createElement("div");
+          shadow.id = "shadow" + i;
+          shadow.className = "windCell";
+          wi.appendChild(shadow);
+        }
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var cell = document.createElement("div");
+          cell.id = "cell" + i;
+          cell.className = "windCell";
+          wi.appendChild(cell);
+        }
+        setWindAngle(newAngle);
+        startWindAnimation();
+      }
+
+      function setWindAngle(newAngle) {
+        wind_angle = newAngle;
+        var rad = newAngle * (Math.PI / 180);
+        var rad2 = rad - Math.PI;
+        var radius = 23;
+        var cx = 29;
+        var cy = 29;
+        var sx = Math.cos(rad2) * radius + cx;
+        var sy = Math.sin(rad2) * radius + cy;
+        var step = (radius * 2) / WIND_CELL_COUNT;
+        var stp = 0;
+
+        for (let i = 0; i < WIND_CELL_COUNT; i++) {
+          var px = sx + Math.cos(rad) * stp;
+          var py = sy + Math.sin(rad) * stp;
+
+          var sh = document.getElementById("shadow" + i);
+          sh.style.top = Math.round(py) - 4 + "px";
+          sh.style.left = Math.round(px) - 4 + "px";
+
+          var cl = document.getElementById("cell" + i);
+          cl.style.top = Math.round(py) - 4 + "px";
+          cl.style.left = Math.round(px) - 4 + "px";
+
+          if (WIND_CELL_COUNT - i > windStrenght) {
+            cl.style.backgroundPosition = "-9px 0px";
+          } else {
+            cl.style.backgroundPosition = "-36px 0px";
+          }
+          stp += step;
+        }
+      }
+
+      function startWindAnimation() {
+        setInterval("doWindAnimation()", WIND_TIMER);
+      }
+
+      function doWindAnimation() {
+        wind_phase++;
+        if (wind_phase > 4) wind_phase = 0;
+
+        for (let i = 0; i < windStrenght; i++) {
+          var state = (wind_phase + i) % 4;
+          var offset = -(9 + state * 9);
+          var cl = document.getElementById(
+            "cell" + (WIND_CELL_COUNT - windStrenght + i)
+          );
+          cl.style.backgroundPosition = offset + "px 0px";
+        }
+      }
+
+      function generateAngle() {
+        gameAngle = Math.round(360 * Math.random());
+        windStrenght = Math.round(15 * Math.random()) + 5;
+        setWindAngle(gameAngle);
+      }
+
+      function getWindXOffset() {
+        var a = gameAngle * (Math.PI / 180) - Math.PI;
+        var xo = Math.cos(a) * windStrenght;
+        return Math.round(xo);
+      }
+
+      function getWindYOffset() {
+        var a = gameAngle * (Math.PI / 180) - Math.PI;
+        var yo = Math.sin(a) * windStrenght;
+        return Math.round(yo);
+      }
+
+      function initPowerBar(xpos, ypos) {
+        var el = document.getElementById("power-back");
+        el.style.visibility = "visible";
+
+        var el2 = document.getElementById("power");
+        el2.style.visibility = "visible";
+        setPowerBarProgress(0);
+      }
+
+      function setPowerBarProgress(val) {
+        var el = document.getElementById("power");
+        el.style.backgroundPosition = "0px " + -(139 - val) + "px";
+        el.style.top = 140 - val + "px";
+        el.style.height = 150 - (139 - val) + "px";
+      }
+
+      function hidePowerBar() {
+        var el = document.getElementById("power-back");
+        el.style.visibility = "hidden";
+        var el2 = document.getElementById("power");
+        el2.style.visibility = "hidden";
+      }
+
+      function initCursor() {
+        // Horizontal range is within gameBox width minus hand width
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var hand = document.getElementById("handCursor");
+
+        // center horizontally
+        var centerX = (gb.width - hand.offsetWidth) / 2;
+        hand_left = centerX;
+        // place near bottom inside gameBox (we use bottom:10px via CSS)
+        moveCursor(hand_left, null);
+      }
+
+      function moveCursor(newX, newY) {
+        var dart = document.getElementById("handCursor");
+        if (typeof newX === "number") {
+          dart.style.left = Math.round(newX) + "px";
+        }
+        if (typeof newY === "number") {
+          dart.style.top = Math.round(newY) + "px";
+        }
+      }
+
+      function doVerticalCursorMovement() {
+        // Map old logical vertical oscillation to visual bottom-offset hand
+        // We'll animate via top based on gameBox coordinate system.
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var hand = document.getElementById("handCursor");
+
+        // Compute absolute top from bottom:10 baseline
+        // Convert current computed top
+        let currentTop = parseFloat(window.getComputedStyle(hand).top);
+        if (isNaN(currentTop)) {
+          // If using bottom positioning, switch to top baseline
+          hand.style.bottom = "";
+          currentTop = gb.height - hand.offsetHeight - 10;
+          hand.style.top = currentTop + "px";
+        }
+
+        // Oscillate between CURSOR_TOP and CURSOR_BOTTOM mapped into this layout
+        // Define a visible band near the bottom (about 30px span like before)
+        var bandHeight = 30;
+        var bottomBaseTop = gb.height - hand.offsetHeight - 10; // top that corresponds to CSS bottom:10px
+        var topLimit = bottomBaseTop - bandHeight; // higher (smaller top)
+        var bottomLimit = bottomBaseTop; // lower (bigger top)
+
+        // Keep internal hand_top aligned to this top coordinate space
+        if (typeof doVerticalCursorMovement.handTop === "undefined") {
+          doVerticalCursorMovement.handTop = bottomLimit;
+        }
+
+        doVerticalCursorMovement.handTop += cursor_ver;
+
+        if (cursor_ver > 0 && doVerticalCursorMovement.handTop > bottomLimit) {
+          doVerticalCursorMovement.handTop = bottomLimit;
+          cursor_ver *= -1;
+        }
+        if (cursor_ver < 0 && doVerticalCursorMovement.handTop < topLimit) {
+          doVerticalCursorMovement.handTop = topLimit;
+          cursor_ver *= -1;
+        }
+
+        // Progress maps the band to 0..130 like before
+        if (SHOW_PROGRESS_BAR == 1) {
+          var prog =
+            ((doVerticalCursorMovement.handTop - topLimit) * 130) /
+            (bottomLimit - topLimit);
+          setPowerBarProgress(prog);
+        }
+
+        moveCursor(null, doVerticalCursorMovement.handTop);
+      }
+
+      function startVerticalCursorMovement() {
+        if (firing == 0 && gameActive) {
+          aimingMode = true;
+          cursorTimerId = setInterval(doVerticalCursorMovement, CURSOR_TIMER);
+          firing = 1;
+
+          if (SHOW_PROGRESS_BAR == 1) {
+            initPowerBar();
+          }
+
+          var aimBtn = document.getElementById("aimButton");
+          if (aimBtn) {
+            aimBtn.classList.add("aiming");
+            aimBtn.textContent = "AIMING...";
+          }
+        }
+      }
+
+      function stopVerticalCursorMovement() {
+        if (!gameActive) return;
+
+        firing = 0;
+        aimingMode = false;
+        clearInterval(cursorTimerId);
+
+        // Compute fire target based on current hand position
+        var hand = document.getElementById("handCursor");
+        var gb = document.getElementById("gameBox").getBoundingClientRect();
+        var handRect = hand.getBoundingClientRect();
+
+        // Convert hand visual position to game coordinates
+        var localX = handRect.left - gb.left;
+        var localY = handRect.top - gb.top;
+
+        // Use prior mapping logic for fireY based on band
+        // Estimate logical hand_top relative to our band and map like before
+        var bottomBaseTop = gb.height - hand.offsetHeight - 10;
+        var bandHeight = 30;
+        var topLimit = bottomBaseTop - bandHeight;
+        var bottomLimit = bottomBaseTop;
+
+        var bandPos = Math.max(topLimit, Math.min(bottomLimit, localY));
+        var bandRatio = (bandPos - topLimit) / (bottomLimit - topLimit); // 0..1
+        // Reuse original scale for Y targeting
+        var fireY =
+          360 - bandRatio * 30 * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
+
+        var fireX = localX - DART_REF_X + HAND_REF_X;
+
+        if (WIND_ACTIVE == 1) {
+          fireDart(fireX + getWindXOffset() * 4, fireY + getWindYOffset() * 4);
+        } else {
+          fireDart(fireX, fireY);
+        }
+
+        var el = document.getElementById("handCursor");
+        el.style.backgroundPosition = "-100px 0px";
+
+        if (SHOW_PROGRESS_BAR == 1) {
+          hidePowerBar();
+        }
+
+        var aimBtn = document.getElementById("aimButton");
+        if (aimBtn) {
+          aimBtn.classList.remove("aiming");
+          aimBtn.textContent = "AIM";
+        }
+      }
+
+      // function fireDart(tarX, tarY) {
+      //     var dart = document.getElementById("dart");
+      //     dart.style.left = tarX + "px";
+      //     dart.style.top = tarY + "px";
+      //     dart.style.visibility = "visible";
+
+      //     computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+      //     generateScore();
+
+      //     playerScore += totalScore;
+
+      //     addScoreA(totalScore);
+
+      //     dartCount--;
+      //     if (dartCount == 0) {
+      //         nextRound();
+      //     }
+      //     // updateGameUI();
+      //     renderIndicator();
+      //     doFlightAnim(0);
+      // }
+
+      function fireDart(tarX, tarY) {
+        var dart = document.getElementById("dart");
+        dart.style.left = tarX + "px";
+        dart.style.top = tarY + "px";
+        dart.style.visibility = "visible";
+
+        computeHit(tarX + DART_REF_X, tarY + DART_REF_Y);
+        generateScore();
+
+        playerScore += totalScore;
+
+        addScoreA(totalScore);
+
+        dartCount--;
+        if (dartCount == 0) {
+          nextRound();
+        }
+        renderIndicator();
+        doFlightAnim(0);
+
+        // Show hit or miss message based on whether within board radius
+        var dx = tarX + DART_REF_X - BOARD_CENTER_X;
+        var dy = tarY + DART_REF_Y - BOARD_CENTER_Y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= BOARD_RADIUS) {
+          showMessage("Wow! Awesome!");
+        } else {
+          showMessage("Missed it!");
+        }
+      }
+
+      function generateScore() {
+        if (segmentType >= SEGMENT_NAMES.length) {
+          totalScore = 0;
+          return;
+        }
+        if (segment >= SCORE_VALUES.length) {
+          totalScore = 0;
+          return;
+        }
+
+        if (SEGMENT_NAMES[segmentType] == "out") {
+          totalScore = 0;
+        } else if (SEGMENT_NAMES[segmentType] == "50") {
+          totalScore = 50;
+        } else {
+          if (SEGMENT_NAMES[segmentType] == "25") {
+            totalScore = 25;
+          } else {
+            totalScore = SCORE_VALUES[segment];
+            if (SEGMENT_NAMES[segmentType] == "double") totalScore *= 2;
+            if (SEGMENT_NAMES[segmentType] == "tripple") totalScore *= 3;
+          }
+        }
+      }
+
+      function computeHit(xpos, ypos) {
+        var dx = BOARD_CENTER_X - xpos;
+        var dy = BOARD_CENTER_Y - ypos;
+        var angle = Math.atan2(dy, dx);
+        var delta = Math.sqrt(dx * dx + dy * dy);
+
+        var sg = 0;
+        for (let i = 0; i < 6; i++) {
+          if (delta > SEGMENTS[i]) sg = i + 1;
+        }
+
+        segmentType = sg;
+        segmentIndex = Math.round(-angle * (180.0 / Math.PI) + 180.0);
+        segment = Math.round(segmentIndex / (360.0 / SEGMENT_COUNT));
+        if (segment < 0) segment = 0;
+        if (segment >= SCORE_VALUES.length) segment = SCORE_VALUES.length - 1;
+      }
+
+      function addScoreA(msg) {
+        // scoreA is hidden; no-op visual
+      }
+
+      function showcell(x, y, id) {
+        var el = document.getElementById(id);
+        var cx = -(x * sprite_cellwidth);
+        var cy = -(y * sprite_cellheight);
+        el.style.backgroundPosition = cx + "px " + cy + "px";
+      }
+
+      function doFlightAnim(step) {
+        clearTimeout(animId);
+        if (step <= 20) {
+          showcell(step, 0, "dart");
+          animId = setTimeout(function () {
+            doFlightAnim(step + 1);
+          }, FLIGHT_ANIM_DELAY);
+        } else {
+          var el = document.getElementById("handCursor");
+          el.style.backgroundPosition = "0px 0px";
+        }
+      }
+
+      function renderIndicator() {
+        var width = dartCount * 35;
+        var drt = document.getElementById("darts");
+        drt.style.width = width + "px";
+      }
+
+      /* Drag: horizontal only within gameBox */
+      (function enableHandDrag() {
+        var hand = document.getElementById("handCursor");
+        var game = document.getElementById("gameBox");
+        var dragging = false;
+        var startX = 0;
+        var startLeft = 0;
+
+        function getBounds() {
+          var gb = game.getBoundingClientRect();
+          var hw = hand.offsetWidth;
+          return { min: 0, max: gb.width - hw };
+        }
+
+        function onPointerDown(e) {
+          dragging = true;
+          hand.classList.add("dragging");
+          hand.setPointerCapture?.(e.pointerId);
+          var gb = game.getBoundingClientRect();
+          var left = parseFloat(getComputedStyle(hand).left) || 0;
+          startLeft = left;
+          startX = e.clientX;
+        }
+
+        function onPointerMove(e) {
+          if (!dragging) return;
+          var deltaX = e.clientX - startX;
+          var bounds = getBounds();
+          var newLeft = Math.max(
+            bounds.min,
+            Math.min(bounds.max, startLeft + deltaX)
+          );
+          moveCursor(newLeft, null);
+        }
+
+        function onPointerUp(e) {
+          dragging = false;
+          hand.classList.remove("dragging");
+          hand.releasePointerCapture?.(e.pointerId);
+        }
+
+        // Pointer events cover mouse + touch
+        hand.addEventListener("pointerdown", onPointerDown);
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", onPointerUp);
+      })();
+
+      /* Keyboard support for AIM/FIRE only */
+      document.addEventListener("keydown", function (e) {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (!aimingMode) startVerticalCursorMovement();
+          else stopVerticalCursorMovement();
+        }
+      });
+
+      // Initialize
+      window.addEventListener("load", function () {
+        // initGameUI();
+        initMobileControls();
+        initCursor();
+        initPowerBar();
+        hidePowerBar();
+        initWindIndicator(45);
+        generateAngle();
+        renderIndicator();
+        // updateGameUI();
+      });
+
+      // Prevent zoom on double tap
+      var lastTouchEnd = 0;
+      document.addEventListener(
+        "touchend",
+        function (event) {
+          var now = new Date().getTime();
+          if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        },
+        false
+      );
+    </script>
+  </body>
+</html>
