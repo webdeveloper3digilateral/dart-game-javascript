@@ -15,6 +15,7 @@
         @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
 
         :root {
+            /* Physical margins: use cm so it matches your spec */
             --bottom-safe: 3cm;
             --right-safe: 0.5cm;
         }
@@ -35,7 +36,7 @@
                     #c3e4f1 0%,
                     #c3e4f1 50%,
                     #c3e4f1 100%);
-            /* background: linear-gradient(135deg,
+                    /* background: linear-gradient(135deg,
                     #0f0f23 0%,
                     #1a1a2e 50%,
                     #16213e 100%); */
@@ -249,6 +250,7 @@
             text-shadow: 0 0 10px rgba(255, 255, 0, 0.6);
         }
 
+        /* Add to your existing <style> */
         #hitMessage {
             position: absolute;
             top: 60px;
@@ -259,8 +261,8 @@
             font-family: "Orbitron", monospace;
             font-weight: 700;
             font-size: 32px;
-            color: #0d47a1;
-            text-shadow: 0 0 8px rgba(13, 71, 161, 0.5), 0 0 20px rgba(13, 71, 161, 0.3), 0 2px 4px rgba(0, 0, 0, 0.3);
+            color: #00ffff;
+            text-shadow: 0 0 8px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.5s ease;
@@ -390,55 +392,68 @@
         #gameOverScreen {
             position: fixed;
             inset: 0;
-            background: #cdecfe;
+            background: linear-gradient(135deg,
+                    rgba(0, 0, 0, 0.9),
+                    rgba(20, 20, 40, 0.95));
             z-index: 2000;
             display: none;
             justify-content: center;
             align-items: center;
             flex-direction: column;
+            color: #00ffff;
+            text-align: center;
+            backdrop-filter: blur(10px);
         }
 
-        #gameOverScreen img {
-            max-width: 90%;
-            max-height: 90%;
-            width: auto;
-            height: auto;
-            object-fit: contain;
+        #gameOverScreen h1 {
+            font-size: 48px;
+            color: #ffff00;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+            font-weight: 700;
+            letter-spacing: 3px;
+            animation: glow 2s ease-in-out infinite alternate;
         }
 
-        /* Logo styles */
-        #leftLogo {
-            position: fixed;
-            bottom: 170px;
-            left: 20px;
-            z-index: 100;
-            width: auto;
-            height: auto;
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+            }
+
+            to {
+                text-shadow: 0 0 50px rgba(255, 255, 0, 1);
+            }
         }
 
-        #leftLogo img {
-            max-width: 180px;
-            max-height: 90px;
-            width: auto;
-            height: auto;
-            /* filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3)); */
+        #gameOverScreen p {
+            font-size: 24px;
+            margin: 15px 0;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
         }
 
-        #rightLogo {
-            position: fixed;
-            bottom: 170px;
-            right: 20px;
-            z-index: 100;
-            width: auto;
-            height: auto;
+        #restartButton {
+            padding: 18px 35px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: "Orbitron", monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(76, 175, 80, 0.5);
         }
 
-        #rightLogo img {
-            max-width: 150px;
-            max-height: 90px;
-            width: auto;
-            height: auto;
-            /* filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3)); */
+        #restartButton:hover {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(76, 175, 80, 0.7);
         }
 
         /* Responsive tweaks */
@@ -478,14 +493,6 @@
                 transform: translateX(-50%);
                 bottom: calc(var(--bottom-safe) - 75px);
             }
-
-            #leftLogo {
-                bottom: 155px;
-            }
-
-            #rightLogo {
-                bottom: 155px;
-            }
         }
 
         @media screen and (max-width: 480px) {
@@ -516,29 +523,12 @@
                 bottom: calc(var(--bottom-safe) - 80px);
             }
 
-            #gameOverScreen img {
-                max-width: 95%;
-                max-height: 95%;
+            #gameOverScreen h1 {
+                font-size: 36px;
             }
 
-            #leftLogo {
-                bottom: 140px;
-                left: 15px;
-            }
-
-            #leftLogo img {
-                max-width: 120px;
-                max-height: 70px;
-            }
-
-            #rightLogo {
-                bottom: 140px;
-                right: 15px;
-            }
-
-            #rightLogo img {
-                max-width: 90px;
-                max-height: 70px;
+            #gameOverScreen p {
+                font-size: 18px;
             }
         }
     </style>
@@ -547,10 +537,12 @@
 <body>
     <div id="gameBox">
         <div id="windIndicator"></div>
+        <!-- Add this inside #gameBox just above the dart element -->
         <div id="hitMessage"></div>
 
         <div id="darts"></div>
 
+        <!-- Power bar sits inside right gutter -->
         <div id="power-back">
             <div id="power" style="background-position: 0px -139px"></div>
         </div>
@@ -560,18 +552,11 @@
         <div id="dart">&nbsp;</div>
     </div>
 
-    <!-- Logos -->
-    <div id="leftLogo">
-        <img src="media/Sitapril Logo.png" alt="Sitapril">
-    </div>
-    <div id="rightLogo">
-        <img src="media/Diazac Logo .png" alt="DIAZAC">
-    </div>
-
     <script>
         var SHOW_PROGRESS_BAR = 1;
         var WIND_ACTIVE = 1;
 
+        /* Game plane (old logical resolution kept for math, visuals now stretch to fullscreen) */
         var GAME_XRES = 550;
         var GAME_YRES = 400;
 
@@ -674,6 +659,7 @@
                 navigator.userAgent
             );
 
+        /* Removed left/right button logic: use only AIM and FIRE plus drag for horizontal move */
 
         function initMobileControls() {
             var controlsDiv = document.createElement("div");
@@ -792,6 +778,7 @@
             }
         }
 
+        // Add this helper function somewhere in your script
         function showMessage(text) {
             var msg = document.getElementById("hitMessage");
             msg.textContent = text;
@@ -809,12 +796,16 @@
             gameOverScreen.id = "gameOverScreen";
             gameOverScreen.style.display = "flex";
             gameOverScreen.innerHTML = `
-                <img src="media/WDD_28Oct2025.jpg" alt="Game Over">
+                <h1>GAME COMPLETE</h1>
+               
+               
+                <button id="restartButton">PLAY AGAIN</button>
             `;
             document.body.appendChild(gameOverScreen);
 
-            // Add click handler to close the image and restart
-            gameOverScreen.addEventListener("click", restartGame);
+            document
+                .getElementById("restartButton")
+                .addEventListener("click", restartGame);
         }
 
         function restartGame() {
@@ -970,6 +961,7 @@
             // center horizontally
             var centerX = (gb.width - hand.offsetWidth) / 2;
             hand_left = centerX;
+            // place near bottom inside gameBox (we use bottom:10px via CSS)
             moveCursor(hand_left, null);
         }
 
@@ -984,30 +976,31 @@
         }
 
         function doVerticalCursorMovement() {
-
+            // Map old logical vertical oscillation to visual bottom-offset hand
+            // We'll animate via top based on gameBox coordinate system.
             var gb = document.getElementById("gameBox").getBoundingClientRect();
             var hand = document.getElementById("handCursor");
 
+            // Compute absolute top from bottom:10 baseline
+            // Convert current computed top
             let currentTop = parseFloat(window.getComputedStyle(hand).top);
             if (isNaN(currentTop)) {
-                let currentBottom = parseFloat(window.getComputedStyle(hand).bottom);
-                if (isNaN(currentBottom)) {
-                    currentBottom = 80;
-                }
+                // If using bottom positioning, switch to top baseline
                 hand.style.bottom = "";
-                currentTop = gb.height - currentBottom - hand.offsetHeight;
+                currentTop = gb.height - hand.offsetHeight - 10;
                 hand.style.top = currentTop + "px";
             }
 
+            // Oscillate between CURSOR_TOP and CURSOR_BOTTOM mapped into this layout
+            // Define a visible band near the bottom (about 30px span like before)
             var bandHeight = 30;
-            var bottomBaseTop = gb.height - 80 - hand.offsetHeight;
-            var topLimit = bottomBaseTop - bandHeight + 5; // higher (smaller top), shifted 5px down
-            var bottomLimit = bottomBaseTop + 5; // lower (bigger top), shifted 5px down from initial
+            var bottomBaseTop = gb.height - hand.offsetHeight - 10; // top that corresponds to CSS bottom:10px
+            var topLimit = bottomBaseTop - bandHeight; // higher (smaller top)
+            var bottomLimit = bottomBaseTop; // lower (bigger top)
 
             // Keep internal hand_top aligned to this top coordinate space
-            // Start at the new bottom limit (5px lower than original position)
             if (typeof doVerticalCursorMovement.handTop === "undefined") {
-                doVerticalCursorMovement.handTop = bottomLimit; // Start 5px down from initial position
+                doVerticalCursorMovement.handTop = bottomLimit;
             }
 
             doVerticalCursorMovement.handTop += cursor_ver;
@@ -1022,15 +1015,10 @@
             }
 
             // Progress maps the band to 0..130 like before
-            // Use original unshifted band limits for power calculation (keep it like before)
             if (SHOW_PROGRESS_BAR == 1) {
-                var originalTopLimit = bottomBaseTop - bandHeight; // original (no shift)
-                var originalBottomLimit = bottomBaseTop; // original (no shift)
-                // Adjust handTop to account for 5px visual shift when calculating power
-                var adjustedHandTop = doVerticalCursorMovement.handTop - 5;
                 var prog =
-                    ((adjustedHandTop - originalTopLimit) * 130) /
-                    (originalBottomLimit - originalTopLimit);
+                    ((doVerticalCursorMovement.handTop - topLimit) * 130) /
+                    (bottomLimit - topLimit);
                 setPowerBarProgress(prog);
             }
 
@@ -1071,15 +1059,16 @@
             var localX = handRect.left - gb.left;
             var localY = handRect.top - gb.top;
 
-
-            var bottomBaseTop = gb.height - 80 - hand.offsetHeight;
+            // Use prior mapping logic for fireY based on band
+            // Estimate logical hand_top relative to our band and map like before
+            var bottomBaseTop = gb.height - hand.offsetHeight - 10;
             var bandHeight = 30;
             var topLimit = bottomBaseTop - bandHeight;
             var bottomLimit = bottomBaseTop;
 
-            var adjustedY = localY - 5;
-            var bandPos = Math.max(topLimit, Math.min(bottomLimit, adjustedY));
-            var bandRatio = (bandPos - topLimit) / (bottomLimit - topLimit);
+            var bandPos = Math.max(topLimit, Math.min(bottomLimit, localY));
+            var bandRatio = (bandPos - topLimit) / (bottomLimit - topLimit); // 0..1
+            // Reuse original scale for Y targeting
             var fireY =
                 360 - bandRatio * 30 * ((BOARD_RADIUS * 2 + 20) / 30) - DART_REF_Y;
 
@@ -1232,6 +1221,7 @@
                     "Try aiming better!",
                     "So close!",
                     "Next time!",
+                    "Unlucky!",
                     "Keep practicing!"
                 ];
                 var randomMissPhrase = missPhrases[Math.floor(Math.random() * missPhrases.length)];
@@ -1303,16 +1293,6 @@
             } else {
                 var el = document.getElementById("handCursor");
                 el.style.backgroundPosition = "0px 0px";
-
-                // Reset hand cursor vertical position to initial CSS position (bottom: 80px)
-                var hand = document.getElementById("handCursor");
-                hand.style.top = "";
-                hand.style.bottom = "80px";
-
-                // Reset the handTop tracking variable for next aim cycle
-                if (typeof doVerticalCursorMovement.handTop !== "undefined") {
-                    delete doVerticalCursorMovement.handTop;
-                }
             }
         }
 
@@ -1345,34 +1325,20 @@
             function onPointerDown(e) {
                 e.preventDefault();
                 e.stopPropagation();
-
-                // Get the pointer/touch coordinates correctly
-                var pointerX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-
                 dragging = true;
                 hand.classList.add("dragging");
-
-                if (hand.setPointerCapture && e.pointerId !== undefined) {
-                    hand.setPointerCapture(e.pointerId);
-                }
-
+                hand.setPointerCapture?.(e.pointerId);
                 var gb = game.getBoundingClientRect();
-                var handRect = hand.getBoundingClientRect();
-                // Calculate position relative to gameBox
-                var relativeLeft = handRect.left - gb.left;
-                startLeft = relativeLeft;
-                startX = pointerX;
+                var left = parseFloat(getComputedStyle(hand).left) || 0;
+                startLeft = left;
+                startX = e.clientX || e.touches?.[0]?.clientX || 0;
             }
 
             function onPointerMove(e) {
                 if (!dragging) return;
                 e.preventDefault();
-                e.stopPropagation();
-
-                // Get the pointer/touch coordinates correctly
-                var pointerX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : startX);
-
-                var deltaX = pointerX - startX;
+                var currentX = e.clientX || e.touches?.[0]?.clientX || 0;
+                var deltaX = currentX - startX;
                 var bounds = getBounds();
                 var newLeft = Math.max(
                     bounds.min,
@@ -1382,12 +1348,9 @@
             }
 
             function onPointerUp(e) {
-                if (!dragging) return;
                 dragging = false;
                 hand.classList.remove("dragging");
-                if (hand.releasePointerCapture && e.pointerId !== undefined) {
-                    hand.releasePointerCapture(e.pointerId);
-                }
+                hand.releasePointerCapture?.(e.pointerId);
             }
 
             // Pointer events cover mouse + touch
@@ -1400,15 +1363,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (e.touches.length === 1) {
-                    // Create a touch-like object for compatibility
-                    var touch = e.touches[0];
-                    var touchEvent = {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY,
-                        touches: e.touches,
-                        pointerId: touch.identifier
-                    };
-                    onPointerDown(touchEvent);
+                    onPointerDown(e.touches[0]);
                 }
             }, { passive: false });
 
@@ -1416,16 +1371,8 @@
                 if (dragging) {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (e.touches.length > 0) {
-                        // Create a touch-like object for compatibility
-                        var touch = e.touches[0];
-                        var touchEvent = {
-                            clientX: touch.clientX,
-                            clientY: touch.clientY,
-                            touches: e.touches,
-                            pointerId: touch.identifier
-                        };
-                        onPointerMove(touchEvent);
+                    if (e.touches.length === 1) {
+                        onPointerMove(e.touches[0]);
                     }
                 }
             }, { passive: false });
@@ -1434,11 +1381,7 @@
                 if (dragging) {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Create a proper event object for onPointerUp
-                    var touchEvent = {
-                        pointerId: e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].identifier : undefined
-                    };
-                    onPointerUp(touchEvent);
+                    onPointerUp(e);
                 }
             }, { passive: false });
 
@@ -1446,11 +1389,7 @@
                 if (dragging) {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Create a proper event object for onPointerUp
-                    var touchEvent = {
-                        pointerId: e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].identifier : undefined
-                    };
-                    onPointerUp(touchEvent);
+                    onPointerUp(e);
                 }
             }, { passive: false });
         })();
